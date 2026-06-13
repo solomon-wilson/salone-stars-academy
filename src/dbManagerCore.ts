@@ -1,0 +1,177 @@
+// Persistence schema matching ERD
+export interface Question {
+  questionText: string
+  options: string[]
+  correctOption: string
+  explanation: string
+  krioInstruction: string
+}
+
+export interface Quest {
+  id: string
+  title: string
+  subject: string
+  class_level: string
+  points_award: number
+  difficulty: string
+  questions: Question[]
+  source: "default" | "generated"
+  teacherId?: string
+}
+
+export interface SyncedPupil {
+  id: string
+  name: string
+  class_level: string
+  points: number
+  streak_count: number
+  last_active_date: string
+  badges_earned: string[]
+  synced_at: number
+  teacherId?: string
+}
+
+export interface SyncLog {
+  id: string
+  timestamp: number
+  pupil_name: string
+  delta_points: number
+  event_type: string
+}
+
+export type SyncedStudent = SyncedPupil
+
+export const INITIAL_QUESTS: Quest[] = [
+  {
+    id: "m1-trading-kru-town",
+    title: "Kru Town Market Commerce",
+    subject: "Mathematics",
+    class_level: "Class 3",
+    points_award: 120,
+    difficulty: "Medium",
+    source: "default",
+    questions: [
+      {
+        questionText: "Mariama sells cassava bread in Kru Town Market. She starts with 15 fresh loaves and sells 9. How many loaves are left in her tray?",
+        options: ["6 loaves", "9 loaves", "24 loaves", "5 loaves"],
+        correctOption: "6 loaves",
+        explanation: "15 loaves minus 9 sold leaves Mariama with 6 loaves to sell later.",
+        krioInstruction: "Mariama bin gɛt 15 bray; i səl 9. Wetin lɛf na di tray? 15 minus 9 na 6. Prɛs '6' foh win!"
+      },
+      {
+        questionText: "If each loaf of cassava bread sells for 20 Leones, how many Leones does Mariama earn by selling 3 loaves?",
+        options: ["40 Leones", "60 Leones", "20 Leones", "50 Leones"],
+        correctOption: "60 Leones",
+        explanation: "Selling 3 loaves at 20 Leones each equals 3 x 20 = 60 Leones.",
+        krioInstruction: "Ɛvry loaf na 20 Leone. If i səl 3 foh di fambul dɛm, wetin i gɛt? 3 x 20 Leone na 60 Leone."
+      }
+    ]
+  },
+  {
+    id: "s1-gola",
+    title: "Gola Rain Forest Giants",
+    subject: "General Science",
+    class_level: "Class 4",
+    points_award: 150,
+    difficulty: "Medium",
+    source: "default",
+    questions: [
+      {
+        questionText: "The rare Western Pygmy Hippo lives in Sierra Leone's Gola Rainforest. Is the Pygmy Hippo considered an endangered species or a common household pet?",
+        options: ["Endangered Species", "Household Pet", "Extinct Specimen", "Oceanic Predator"],
+        correctOption: "Endangered Species",
+        explanation: "Pygmy Hippos are endangered, meaning very few are left in the wild and we must preserve their rainforest home.",
+        krioInstruction: "Di tinap-tinap Pygmy Hippo rɛb na bush dɛm! Wi foh mɛnj am foh ya bikos i de foh dɔn. I na endangered spɛshis."
+      },
+      {
+        questionText: "What key resource do chimpanzees and rare monkeys find on Tiwai Island in di Moa River?",
+        options: ["A protected rainforest sanctuary", "A salt water marsh", "An desert sand dune", "An industrial logging mill"],
+        correctOption: "A protected rainforest sanctuary",
+        explanation: "Tiwai Island is a world-renowned wildlife sanctuary offering a protected natural rainforest habitat.",
+        krioInstruction: "Tiwai Island na di Moa Riva na rich bush we de protɛkt di bɔbɔ chimpanzee dɛm fɔh hɔntin. Na sanctuary."
+      }
+    ]
+  },
+  {
+    id: "st1-cotton-tree",
+    title: "Historic Cotton Tree & Bai Bureh",
+    subject: "Social Studies & Civics",
+    class_level: "Class 5",
+    points_award: 180,
+    difficulty: "Hard",
+    source: "default",
+    questions: [
+      {
+        questionText: "Which brave Sierra Leonean ruler and strategist led the 1898 Hut Tax Rebellion against di British administration?",
+        options: ["Bai Bureh", "Sengbe Pieh", "Madam Yoko", "Wallace Johnson"],
+        correctOption: "Bai Bureh",
+        explanation: "Bai Bureh was from Kasseh and successfully defended his territory during the British Hut Tax War.",
+        krioInstruction: "Di brayv lida we fɛt di britis dɛm foh di hut tɔks na bin Bai Bureh!"
+      },
+      {
+        questionText: "Under which majestic national symbol in Freetown did early settlers and freed slaves gather to pray for freedom?",
+        options: ["The historic Cotton Tree", "The Bailey Bridge", "The Bintumani Peak", "The Outamba Swamp"],
+        correctOption: "The historic Cotton Tree",
+        explanation: "The historic Freetown Cotton Tree stood for centuries in Central Freetown, representing liberty, resilience, and community gathering.",
+        krioInstruction: "Wi fambul dɛm we friman sɔt dɔn de wɔship and pre fɔh fridom na di rɔyal Kɔtin Tri dɔn Fritɔn."
+      }
+    ]
+  }
+]
+
+export const INITIAL_PUPILS: SyncedPupil[] = [
+  {
+    id: "pupil-1",
+    name: "Alimamy Kamara",
+    class_level: "Class 4",
+    points: 420,
+    streak_count: 6,
+    last_active_date: "2026-06-12",
+    badges_earned: ["Cotton Tree Scholar", "Gola Forest Guardian"],
+    synced_at: Date.now() - 3600000
+  },
+  {
+    id: "pupil-2",
+    name: "Fatmata Sesay",
+    class_level: "Class 3",
+    points: 380,
+    streak_count: 5,
+    last_active_date: "2026-06-13",
+    badges_earned: ["Bintumani Climber"],
+    synced_at: Date.now() - 1200000
+  },
+  {
+    id: "pupil-3",
+    name: "Joseph Kargbo",
+    class_level: "Class 5",
+    points: 510,
+    streak_count: 8,
+    last_active_date: "2026-06-13",
+    badges_earned: ["Cotton Tree Scholar", "Bintumani Climber"],
+    synced_at: Date.now() - 60000
+  }
+]
+
+export const INITIAL_LOGS: SyncLog[] = [
+  {
+    id: "log-1",
+    timestamp: Date.now() - 3600000,
+    pupil_name: "Alimamy Kamara",
+    delta_points: 120,
+    event_type: "Class 4 Science Sync"
+  },
+  {
+    id: "log-2",
+    timestamp: Date.now() - 1200000,
+    pupil_name: "Fatmata Sesay",
+    delta_points: 60,
+    event_type: "Class 3 Commerce Sync"
+  },
+  {
+    id: "log-3",
+    timestamp: Date.now() - 60000,
+    pupil_name: "Joseph Kargbo",
+    delta_points: 180,
+    event_type: "Class 5 Civics Sync"
+  }
+]

@@ -1,0 +1,6 @@
+{
+  "name": "Salone Stars Academy",
+  "description": "An offline-first, gamified learning management system (LMS) designed for Sierra Leonean primary school pupils (Classes 1-6) with local sync capabilities and localized MBSSE-aligned curriculum.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

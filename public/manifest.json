@@ -1,0 +1,22 @@
+{
+  "name": "Salone Stars Academy",
+  "short_name": "Salone Stars",
+  "description": "An offline-first, gamified learning management system for Sierra Leonean primary pupils (Classes 1-6).",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#05060f",
+  "theme_color": "#0a0c21",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2240%22 fill=%22%236366f1%22/><text x=%2250%22 y=%2255%22 font-size=%2235%22 font-family=%22Poppins, sans-serif%22 font-weight=%22black%22 fill=%22%23ffffff%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22>SSA</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2240%22 fill=%22%236366f1%22/><text x=%2250%22 y=%2255%22 font-size=%2235%22 font-family=%22Poppins, sans-serif%22 font-weight=%22black%22 fill=%22%23ffffff%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22>SSA</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

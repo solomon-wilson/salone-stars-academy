@@ -1,0 +1,94 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Unified identity record representing teachers or administrative users.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["teacher", "pupil"] },
+        "subscriptionPlan": { "type": "string", "enum": ["free", "individual", "team"] },
+        "stripeCustomerId": { "type": "string" },
+        "stripeSubscriptionStatus": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Pupil": {
+      "title": "Pupil",
+      "description": "Student gamification stats and classroom progress tracking.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "class_level": { "type": "string" },
+        "points": { "type": "integer" },
+        "streak_count": { "type": "integer" },
+        "last_active_date": { "type": "string" },
+        "badges_earned": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "teacherId": { "type": "string" },
+        "synced_at": { "type": "integer" }
+      },
+      "required": ["id", "name", "class_level", "points", "teacherId"]
+    },
+    "Quest": {
+      "title": "Quest",
+      "description": "Curriculum units containing localized primary quiz assessments.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "subject": { "type": "string" },
+        "class_level": { "type": "string" },
+        "points_award": { "type": "integer" },
+        "difficulty": { "type": "string" },
+        "source": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "alignedMbsseOutcome": { "type": "string" }
+      },
+      "required": ["id", "title", "subject", "class_level", "points_award"]
+    },
+    "Curriculum": {
+      "title": "Curriculum",
+      "description": "Custom school-specific lesson alignments designed by teachers.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "class_level": { "type": "string" },
+        "schoolName": { "type": "string" },
+        "alignedMbsseOutcome": { "type": "string" },
+        "topics": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "description": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "teacherId", "class_level", "alignedMbsseOutcome", "topics"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Identities and subscription settings."
+    },
+    "/pupils/{pupilId}": {
+      "schema": "Pupil",
+      "description": "Children records mapped to class levels and teachers."
+    },
+    "/quests/{questId}": {
+      "schema": "Quest",
+      "description": "Classroom quests containing standard multiple choice queries."
+    },
+    "/curriculums/{curriculumId}": {
+      "schema": "Curriculum",
+      "description": "Customized school schedules matching national MBSSE goals."
+    }
+  }
+}
