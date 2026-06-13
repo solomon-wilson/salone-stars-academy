@@ -30,6 +30,14 @@ export interface SyncedPupil {
   synced_at: number
   teacherId?: string
   parentId?: string
+  subject_stats?: Record<string, { correct: number; total: number }>
+}
+
+export interface PupilInvite {
+  code: string
+  pupilId: string
+  teacherId: string
+  createdAt: number
 }
 
 export interface SyncLog {

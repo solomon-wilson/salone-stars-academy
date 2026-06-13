@@ -1,6 +1,6 @@
 import { useMemo } from "react"
 import type { Quest } from "../../../types"
-import { pickDailyQuest } from "../../../lib/daily-path"
+import { pickDailyQuest, pickFallbackDefaultQuest } from "../../../lib/daily-path"
 
 type UseDailyPathArgs = {
   quests: Quest[]
@@ -8,6 +8,7 @@ type UseDailyPathArgs = {
   completedQuests: Record<string, boolean>
   weeklyTopics: string
   isPremium: boolean
+  childId?: string | null
 }
 
 export const useDailyPath = ({
@@ -16,24 +17,35 @@ export const useDailyPath = ({
   completedQuests,
   weeklyTopics,
   isPremium,
+  childId,
 }: UseDailyPathArgs) => {
   const completedIds = useMemo(
     () => Object.keys(completedQuests).filter(id => completedQuests[id]),
     [completedQuests]
   )
 
-  const dailyQuest = useMemo(
-    () => pickDailyQuest(quests, classLevel, completedIds, weeklyTopics, isPremium),
-    [quests, classLevel, completedIds, weeklyTopics, isPremium]
-  )
+  const { dailyQuest, isFallback } = useMemo(() => {
+    const picked = pickDailyQuest(
+      quests,
+      classLevel,
+      completedIds,
+      weeklyTopics,
+      isPremium,
+      new Date(),
+      childId ?? undefined
+    )
+    if (picked) return { dailyQuest: picked, isFallback: false }
+    const fallback = pickFallbackDefaultQuest(quests, classLevel)
+    return { dailyQuest: fallback, isFallback: Boolean(fallback) }
+  }, [quests, classLevel, completedIds, weeklyTopics, isPremium, childId])
 
   const subjectsThisWeek = useMemo(() => {
     const subjects = new Set<string>()
     quests
-      .filter(q => q.class_level === classLevel && completedIds.includes(q.id))
+      .filter(q => completedIds.includes(q.id))
       .forEach(q => subjects.add(q.subject))
     return Array.from(subjects)
-  }, [quests, classLevel, completedIds])
+  }, [quests, completedIds])
 
-  return { dailyQuest, completedIds, subjectsThisWeek }
+  return { dailyQuest, completedIds, subjectsThisWeek, isFallback }
 }

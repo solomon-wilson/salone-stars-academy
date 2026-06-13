@@ -61,7 +61,9 @@ service cloud.firestore {
              data.email is string && data.email.size() <= 256 &&
              data.name is string && data.name.size() <= 128 &&
              data.role in ["teacher", "pupil", "parent"] &&
-             data.subscriptionPlan in ["free", "individual", "team"];
+             data.subscriptionPlan in ["free", "individual", "team"] &&
+             (!('whatsappPhone' in data) || (data.whatsappPhone is string && data.whatsappPhone.size() <= 20)) &&
+             (!('digestOptIn' in data) || data.digestOptIn is bool);
     }
 
     function isValidPupil(data) {

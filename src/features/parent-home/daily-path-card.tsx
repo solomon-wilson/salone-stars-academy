@@ -7,6 +7,7 @@ import type { Quest } from "../../types"
 type DailyPathCardProps = {
   dailyQuest: Quest | null
   isPremium: boolean
+  isFallback?: boolean
   onStartPractice: () => void
   onUpgrade: () => void
 }
@@ -14,6 +15,7 @@ type DailyPathCardProps = {
 export const DailyPathCard = ({
   dailyQuest,
   isPremium,
+  isFallback = false,
   onStartPractice,
   onUpgrade,
 }: DailyPathCardProps) => (
@@ -32,8 +34,13 @@ export const DailyPathCard = ({
 
     {dailyQuest ? (
       <div className={`rounded-2xl p-4 border ${getSubjectColors(dailyQuest.subject).accent} bg-[#05060f]/80`}>
+        {isFallback && (
+          <p className="text-[10px] text-indigo-400 mb-2 font-semibold">
+            Using default MBSSE quest — all class quests completed or unavailable.
+          </p>
+        )}
         <div className="flex items-center space-x-2 mb-2">
-          <BookOpen className="h-4 w-4 text-indigo-300" />
+          <BookOpen className="h-4 w-4 text-indigo-300" aria-hidden="true" />
           <span className="text-[10px] font-black uppercase text-indigo-300">
             {dailyQuest.subject}
           </span>
@@ -42,7 +49,9 @@ export const DailyPathCard = ({
         <p className="text-[11px] text-indigo-300 mt-1">{dailyQuest.class_level} · {dailyQuest.difficulty}</p>
       </div>
     ) : (
-      <p className="text-xs text-indigo-300">No quests available for this class level yet.</p>
+      <p className="text-xs text-indigo-300">
+        No quests available yet. Connect to sync the MBSSE catalog, or check back after your teacher publishes quests.
+      </p>
     )}
 
     {isPremium ? (
@@ -53,7 +62,7 @@ export const DailyPathCard = ({
         aria-label="Start child's practice"
         className="w-full flex items-center justify-center space-x-2 bg-brand-primary hover:bg-blue-700 disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-widest py-3 rounded-xl cursor-pointer transition"
       >
-        <Play className="h-4 w-4" />
+        <Play className="h-4 w-4" aria-hidden="true" />
         <span>{PARENT_KRIO.startPractice}</span>
       </button>
     ) : (
@@ -66,7 +75,7 @@ export const DailyPathCard = ({
           onClick={onUpgrade}
           className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border border-yellow-500/40 text-yellow-300 text-[10px] font-black uppercase tracking-widest py-3 rounded-xl cursor-pointer transition"
         >
-          <Lock className="h-4 w-4" />
+          <Lock className="h-4 w-4" aria-hidden="true" />
           <span>{PARENT_KRIO.upgradeCta}</span>
         </button>
       </div>

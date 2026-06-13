@@ -56,6 +56,8 @@ export interface FirestoreUser {
   stripeCustomerId?: string;
   stripeSubscriptionStatus?: string;
   createdAt: string;
+  whatsappPhone?: string;
+  digestOptIn?: boolean;
 }
 
 export interface FirestorePupil {
@@ -149,6 +151,20 @@ export async function updateProfile(uid: string, data: Partial<FirestoreUser>): 
     await updateDoc(docRef, data);
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
+export async function updateParentPreferences(
+  uid: string,
+  prefs: { whatsappPhone?: string; digestOptIn?: boolean }
+): Promise<void> {
+  const path = `users/${uid}`
+  try {
+    const docRef = doc(db, "users", uid)
+    await updateDoc(docRef, prefs)
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path)
+    throw error
   }
 }
 

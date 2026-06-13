@@ -24,6 +24,7 @@ export class DatabaseManager {
       quests: INITIAL_QUESTS,
       pupils: INITIAL_PUPILS,
       logs: INITIAL_LOGS,
+      invites: [],
     })
 
     if (this.deploymentMode === "cloud" || this.deploymentMode === "hybrid") {
@@ -63,5 +64,32 @@ export class DatabaseManager {
 
   public async getStudentsAndLogs(): Promise<{ students: SyncedPupil[]; logs: SyncLog[] }> {
     return this.adapter.getStudentsAndLogs()
+  }
+
+  private getLocalAdapter(): LocalJsonAdapter {
+    if (this.adapter instanceof LocalJsonAdapter) return this.adapter
+    if (this.adapter instanceof HybridDataAdapter) return this.adapter.getLocalAdapter()
+    throw new Error("Local adapter unavailable")
+  }
+
+  public async createPupilInvite(pupilId: string, teacherId: string): Promise<string> {
+    return this.getLocalAdapter().createPupilInvite(pupilId, teacherId)
+  }
+
+  public async linkPupilByInvite(code: string, parentId: string): Promise<SyncedPupil> {
+    const pupil = await this.getLocalAdapter().linkPupilByInvite(code, parentId)
+    const firestore = this.deploymentMode !== "pi" ? true : false
+    if (firestore) {
+      try {
+        const { getFirestoreAdmin } = await import("./server/firebaseAdmin")
+        const adminDb = getFirestoreAdmin()
+        if (adminDb) {
+          await adminDb.collection("pupils").doc(pupil.id).set(pupil, { merge: true })
+        }
+      } catch (error) {
+        console.error("[DatabaseManager] linkPupilByInvite cloud write failed:", error)
+      }
+    }
+    return pupil
   }
 }

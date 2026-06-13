@@ -76,6 +76,10 @@ export class HybridDataAdapter implements DataPort {
     this.cloud = new FirestoreAdapter(local)
   }
 
+  getLocalAdapter() {
+    return this.local
+  }
+
   getQuests = () => this.cloud.getQuests()
   publishQuest = (quest: Quest) => this.cloud.publishQuest(quest)
   syncPupil = (

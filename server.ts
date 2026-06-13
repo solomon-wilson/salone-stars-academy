@@ -113,7 +113,7 @@ app.get("/api/quests", async (_req, res) => {
 
 app.post("/api/sync", optionalAuth, async (req: AuthenticatedRequest, res) => {
   try {
-    const { id, name, class_level, points, streak_count, last_active_date, badges_earned, delta_points, parentId } = req.body
+    const { id, name, class_level, points, streak_count, last_active_date, badges_earned, delta_points, parentId, subject_stats } = req.body
     if (!id || !name) {
       return res.status(400).json({ error: "Pupil ID and Name are required for sync." })
     }
@@ -129,6 +129,7 @@ app.post("/api/sync", optionalAuth, async (req: AuthenticatedRequest, res) => {
         badges_earned,
         teacherId: req.firebaseUser?.uid,
         parentId: parentId || undefined,
+        subject_stats: subject_stats || undefined,
       },
       delta_points || 0
     )
@@ -356,7 +357,7 @@ app.post("/api/parent/generate-homework", requireAuth, async (req: Authenticated
       Parameters:
       - Subject: ${subject || "Mixed"}
       - Class/Level: ${class_level}
-      - Parent weekly topic note: ${topics}
+      - Parent weekly topic note: ${topics} (may be in Krio — interpret and align internally)
       
       Requirements for exactly 2 questions:
       - Align with the parent's weekly topic note.
@@ -430,6 +431,32 @@ app.post("/api/parent/publish-homework", requireAuth, async (req: AuthenticatedR
     res.json({ success: true, quest: questWithMeta })
   } catch {
     res.status(500).json({ error: "Failed to publish homework quest." })
+  }
+})
+
+app.post("/api/teacher/generate-invite", requireAuth, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { pupilId } = req.body
+    if (!pupilId || typeof pupilId !== "string") {
+      return res.status(400).json({ error: "pupilId is required." })
+    }
+    const code = await db.createPupilInvite(pupilId, req.firebaseUser!.uid)
+    res.json({ code, pupilId })
+  } catch (error: any) {
+    res.status(400).json({ error: error.message || "Failed to generate invite code." })
+  }
+})
+
+app.post("/api/parent/link-by-invite", requireAuth, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { inviteCode } = req.body
+    if (!inviteCode || typeof inviteCode !== "string") {
+      return res.status(400).json({ error: "inviteCode is required." })
+    }
+    const pupil = await db.linkPupilByInvite(inviteCode.trim(), req.firebaseUser!.uid)
+    res.json({ success: true, pupil })
+  } catch (error: any) {
+    res.status(400).json({ error: error.message || "Failed to link pupil by invite." })
   }
 })
 

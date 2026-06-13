@@ -80,4 +80,6 @@ export interface UserProfile {
   stripeCustomerId?: string;
   stripeSubscriptionStatus?: string;
   createdAt: string;
+  whatsappPhone?: string;
+  digestOptIn?: boolean;
 }

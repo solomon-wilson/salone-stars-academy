@@ -77,6 +77,45 @@ Use `apiFetch()` from `src/lib/api-client.ts` for authenticated API calls.
 - Parent Individual plan: max 3 linked children (`MAX_PARENT_CHILDREN` in `src/constants/parent.ts`)
 - Home pupils use `parentId` on Firestore pupil docs; sync passes `parentId` in `/api/sync` body
 - Curriculum upload remains **teacher-only**; parents use daily path + AI homework instead
+- In-memory rate limiters (`Map`/`Set`) are per-process — bypassed at multi-instance scale; use Redis
+- `fs.writeFileSync` in `localJsonAdapter` is Pi-offline only (single process); never call in cloud/hybrid mode
+- `getQuests()` from Firestore must always include `.limit(200)` and a pagination cursor — no full collection scans
+- Badge count in LWW merge must be capped at 32 before writing to Firestore (rules reject arrays > 32)
+- SW cache version must embed `VITE_BUILD_HASH` — hardcoded `"v1"` causes stale cache on every deploy
+- `localStorage` writes are silent on quota failure (Android) — always wrap in `try/catch` and evict LRU on `QuotaExceededError`
+
+## Scalability Patterns (1M DAU baseline)
+
+### Rate Limiting
+Use Redis-backed rate limiter (Upstash / Vercel KV) — **never** an in-memory `Map`. Key pattern: `rate:{uid}:{action}`. Falls back to in-memory only when `REDIS_URL` is absent (Pi-offline mode). Export `createRedisRateLimiter()` from `src/server/rateLimiter.ts`.
+
+### Token Verification Cache
+Cache decoded Firebase tokens in Redis: key `token_cache:{sha256(token)}`, TTL 55 min. Module: `src/server/tokenCache.ts`. Eliminates per-request Firebase Auth network call on ~95% of authenticated traffic.
+
+### Quest API Caching
+`GET /api/quests` must return `Cache-Control: public, max-age=300, stale-while-revalidate=60` and an `ETag` (sha1 of JSON). Vercel Edge CDN absorbs read load. Daily path selection is client-side from this cached list — zero origin calls for path picks.
+
+### Firestore Batch Writes
+Never call `firestoreAdapter.syncPupil()` in a per-pupil loop. Use `db.batch()` for classroom syncs; max 500 ops per batch. Fail loudly (throw) if the batch rejects — do **not** swallow errors and return stale local data as success.
+
+### Firestore Rule Cost
+Assign `get(/databases/.../users/$(request.auth.uid)).data` to a local variable **once** per `match` block. Each `get()` is a billed Firestore read; calling `getUserProfile()` twice in the same rule doubles costs.
+
+### Code Splitting
+Feature chunks must be lazy-loaded via `React.lazy()`. Never add a static import for a feature module in `App.tsx` — always `const X = lazy(() => import('./features/...'))` wrapped in `<Suspense>`. Target: ≤ 150 KB gzipped initial chunk.
+
+### Service Worker
+SW cache name must embed `import.meta.env.VITE_BUILD_HASH` — never hardcode `"v1"`. Use Background Sync API (`tag: 'sync-pupil-progress'`) for failed `POST /api/sync`. Sync queue lives in IndexedDB key `ssa_sync_queue`.
+
+### localStorage vs IndexedDB
+- **localStorage**: active-session pupil profile and daily-path picks cache only (< 5 KB per child, needs synchronous read)
+- **IndexedDB**: quest stats history, completed quest IDs, badge history — these grow unbounded and will silently fail Android quota limits in localStorage
+
+### API Client Resilience
+`apiFetch()` must include: 3 retries, exponential backoff (1s → 2s → 4s), 10s timeout, offline detection (`!navigator.onLine` → enqueue to `ssa_sync_queue`). On Sierra Leone 2G/3G, ~5–10% of requests fail transiently; zero-retry silently drops pupil progress.
+
+### Animation Budget
+Wrap infinite CSS animations (`desktop-flow-*`, `mobile-flow-*`) in `@media (prefers-reduced-motion: no-preference)`. Pause via `animation-play-state: paused` after 60s document inactivity (use `document.visibilitychange`). Background gradient loops are the largest battery drain on low-end devices.
 
 ## Configuration
 

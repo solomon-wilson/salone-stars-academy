@@ -3,10 +3,11 @@ import type { Quest, Question, PupilProfile } from "../../../types"
 
 type QuizCallbacks = {
   onCorrectAnswer: (profileUpdater: (prev: PupilProfile) => PupilProfile, pointsDelta: number) => void
-  onQuestComplete: (questId: string, pointsAward: number) => void
+  onQuestComplete: (questId: string, pointsAward: number, subject: string) => void
+  onAnswerRecorded?: (questId: string, subject: string, isCorrect: boolean) => void
 }
 
-export function useQuizEngine({ onCorrectAnswer, onQuestComplete }: QuizCallbacks) {
+export function useQuizEngine({ onCorrectAnswer, onQuestComplete, onAnswerRecorded }: QuizCallbacks) {
   const [activeQuest, setActiveQuest] = useState<Quest | null>(null)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [selectedResponse, setSelectedResponse] = useState<string | null>(null)
@@ -24,12 +25,14 @@ export function useQuizEngine({ onCorrectAnswer, onQuestComplete }: QuizCallback
   const exitQuest = () => setActiveQuest(null)
 
   const checkAnswer = (question: Question) => {
-    if (!selectedResponse) return
+    if (!selectedResponse || !activeQuest) return
     const isCorrect = selectedResponse === question.correctOption
     setIsResponseCorrect(isCorrect)
     setIsAnswerChecked(true)
 
-    if (isCorrect && activeQuest) {
+    onAnswerRecorded?.(activeQuest.id, activeQuest.subject, isCorrect)
+
+    if (isCorrect) {
       const quest = activeQuest
       onCorrectAnswer((prev) => {
         let newStreak = prev.streak_count
@@ -60,7 +63,7 @@ export function useQuizEngine({ onCorrectAnswer, onQuestComplete }: QuizCallback
     if (!activeQuest) return
     const isLast = currentQuestionIndex === activeQuest.questions.length - 1
     if (isLast) {
-      onQuestComplete(activeQuest.id, activeQuest.points_award)
+      onQuestComplete(activeQuest.id, activeQuest.points_award, activeQuest.subject)
       setActiveQuest(null)
       setCurrentQuestionIndex(0)
       setSelectedResponse(null)

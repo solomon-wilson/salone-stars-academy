@@ -392,6 +392,17 @@ src/
 | **Privacy** | Parent reads only linked children; COPPA-aligned: no child email required |
 | **Cost control** | Parent Gemini homework capped at 5/day (vs teacher 10/hr) |
 | **Offline (parent)** | Daily path cached locally; stale banner if > 7 days offline |
+| **Scale** | Support 1M DAU without architecture change; stateless Express; horizontal serverless scaling |
+| **Rate limits** | Distributed (Redis-backed) rate limiting across all API instances — no in-memory Map |
+| **Token cache** | Firebase ID token cached server-side ≤ 55 min (token TTL 60 min); eliminates per-request Auth call |
+| **Quest read latency** | `GET /api/quests` served from CDN cache; TTL 5 min; ETag support; ≤ 50ms p99 at edge |
+| **Sync write throughput** | Firestore batch writes (up to 500 ops/batch); no unbatched per-pupil fan-out |
+| **Bundle size** | Initial JS payload ≤ 150 KB gzipped via code splitting; feature chunks lazy-loaded |
+| **API resilience** | `apiFetch()`: 3 retries, exponential backoff 1s → 2s → 4s, 10s timeout |
+| **Sync durability** | SW Background Sync API queues failed POST `/api/sync`; guaranteed delivery on reconnect |
+| **Offline storage** | IndexedDB for quest stats, badge history, completed quest lists; localStorage for session-only fast path |
+| **Battery** | Infinite CSS animations pause on `prefers-reduced-motion` or after 60s document inactivity |
+| **Firestore rule cost** | `getUserProfile()` assigned to a local variable once per rule block; ≤ 1 billed read per request |
 
 ---
 
@@ -455,6 +466,16 @@ src/
 | Duplicate pupil UUID across devices | Sync LWW; warn parent if name/class conflict detected |
 | Gemini outage | Fall back to MBSSE default quest for the day; no blocking error |
 | Parent exceeds 3-child limit | Block new link; prompt upgrade messaging (Team tier future) |
+| Cold-start spike (Vercel) | Warm-up ping on deploy; `/api/quests` pre-warmed via CDN before traffic shifts |
+| 1M parents fetching daily path simultaneously | Daily path computed client-side from cached quest list; zero server calls for path selection |
+| Write storm on classroom sync (100+ pupils) | Batch writes (≤ 500/batch) + exponential backoff; Vercel Queues absorbs overflow |
+| Stripe webhook surge | Idempotency key = `stripe_event_id`; deduped in Firestore before Admin SDK write |
+| localStorage quota exceeded | Detect `QuotaExceededError`; evict oldest quest stats (LRU) before retry |
+| Stale SW cache after deploy | SW install event deletes all caches not matching current `VITE_BUILD_HASH` |
+| Badge count > 32 on LWW merge | Cap merge output at 32 badges; log overflow server-side; never write invalid doc to Firestore |
+| 3G timeout on Stripe checkout | Checkout page is Stripe-hosted; SSA bundle not involved in payment rendering |
+| Firebase Auth outage | Token cache (Redis, TTL 55 min) keeps existing authenticated sessions alive |
+| Gemini quota burst (parent homework) | Return last cached daily quest if Gemini returns 429; display "using saved quest" banner |
 
 ---
 
@@ -694,7 +715,85 @@ For Parent Home implementation, invoke **"use a workflow"** pattern:
 
 ---
 
-## 16. Appendix — Key files reference
+## 16. Scale Architecture (1M DAU)
+
+This section encodes the non-negotiable architectural decisions for consumer-grade scale. All items below must be implemented before any public growth campaign. Pi-offline mode is exempt where noted.
+
+### 16.1 Distributed Rate Limiting
+
+Replace the in-memory `Map` in `src/server/rateLimiter.ts` with a Redis-backed sliding-window limiter (Upstash or Vercel KV). Key pattern: `rate:{uid}:{action}`. Falls back to in-memory only when `REDIS_URL` is absent (Pi-offline mode). This is required before multi-instance or serverless deployment — each Vercel Function instance has its own memory; the per-process Map allows attackers to multiply the allowed rate by instance count.
+
+### 16.2 Token Verification Cache
+
+`src/server/authMiddleware.ts` currently calls Firebase Auth on every request. At 1M DAU this saturates Firebase Auth quotas. Cache decoded tokens in Redis: key `token_cache:{sha256(token)}`, TTL 55 min (tokens expire at 60 min). Module: `src/server/tokenCache.ts`. On cache miss, call Firebase Admin `verifyIdToken()` as today, then write to cache.
+
+### 16.3 Quest CDN Cache
+
+`GET /api/quests` must add `Cache-Control: public, max-age=300, stale-while-revalidate=60` and an `ETag` header derived from `sha1(JSON.stringify(quests))`. Vercel Edge Network absorbs the read load; origin only receives requests on cache misses or ETag mismatches. Daily path selection runs client-side against the cached quest list — zero origin calls for path picks.
+
+### 16.4 Firestore Composite Indexes (`firestore.indexes.json`)
+
+| Collection | Index | Used by |
+|------------|-------|---------|
+| `pupils` | `(teacherId ASC, points DESC)` | Classroom leaderboard |
+| `pupils` | `(parentId ASC, last_active_date DESC)` | Parent digest |
+| `curriculums` | `(teacherId ASC, created_at DESC)` | Curriculum list |
+| `users` | `(stripeCustomerId ASC)` | Billing webhook lookup |
+
+Without these, Firestore auto-creates indexes on first query — a cold-start penalty that causes 429s in production.
+
+### 16.5 Firestore Batch Writes
+
+`firestoreAdapter.syncPupil()` must use `WriteBatch` when syncing more than one pupil (classroom sync path). Batch limit: 500 operations. The batch must fail loudly (`throw`) on rejection — do not swallow the error and return stale local data as if the cloud write succeeded (current behaviour in `src/data/firestoreAdapter.ts:55-62`).
+
+### 16.6 Code Splitting (Vite + React.lazy)
+
+The current 910 KB unsplit bundle takes 6+ seconds on 3G. Required split:
+
+```ts
+// vite.config.ts — manualChunks
+'vendor-react':   ['react', 'react-dom'],
+'vendor-firebase':['firebase/app', 'firebase/auth', 'firebase/firestore'],
+'feature-teacher':['./src/features/teacher-pi'],
+'feature-parent': ['./src/features/parent-home'],
+```
+
+`src/App.tsx` must replace all static feature imports with `React.lazy(() => import(...))` wrapped in `<Suspense>`. Target: ≤ 150 KB gzipped initial chunk.
+
+### 16.7 Service Worker Versioning + Background Sync
+
+- Cache name must embed build hash: `salone-stars-cache-v${VITE_BUILD_HASH}`. SW install event deletes all caches with non-matching names. Hardcoded `"v1"` is a stale-cache incident waiting to happen.
+- Register Background Sync tag `'sync-pupil-progress'` for failed `POST /api/sync`. Queue stored in IndexedDB key `ssa_sync_queue` (not localStorage). On `sync` event, dequeue and retry with exponential backoff.
+
+### 16.8 IndexedDB Migration
+
+Replace `localStorage` for high-volume per-child data:
+
+| Data | Store | Reason |
+|------|-------|--------|
+| Quest stats history | IndexedDB | Grows unbounded; quota risk on Android |
+| Completed quest IDs | IndexedDB | Per-child sets can exceed localStorage limits |
+| Badge history | IndexedDB | Needed for cross-device merge |
+| Daily path picks cache | localStorage | Fast path; < 5 KB per child; acceptable |
+| Active session pupil profile | localStorage | Needs synchronous read at quiz start |
+
+### 16.9 Firestore Rule Cost Reduction
+
+`getUserProfile()` in `firestore.rules` is a `get()` call billed as a Firestore read. It is currently invoked multiple times per write in `hasPremiumPlan()`. Assign to a local variable once per `match` block to reduce to ≤ 1 billed read per request:
+
+```js
+// In each match block that needs plan check:
+let profile = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+// Then use profile.subscriptionPlan and profile.role directly
+```
+
+### 16.10 API Client Resilience
+
+`src/lib/api-client.ts` `apiFetch()` must include: 3 retries, exponential backoff (1s, 2s, 4s), 10-second timeout, and offline detection (`!navigator.onLine` → enqueue to `ssa_sync_queue` instead of dropping). On Sierra Leone 2G/3G, 5–10% of requests fail transiently; the current zero-retry implementation silently loses pupil progress.
+
+---
+
+## 17. Appendix — Key files reference
 
 | File | Role |
 |------|------|

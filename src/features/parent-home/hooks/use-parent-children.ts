@@ -84,5 +84,6 @@ export const useParentChildren = (parentId: string | undefined) => {
     handleSelectChild,
     handleLinkChild,
     canLinkMore: children.length < MAX_PARENT_CHILDREN,
+    refreshChildren,
   }
 }

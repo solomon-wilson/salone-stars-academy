@@ -191,9 +191,58 @@
       "badges_earned": [],
       "parentId": "verify-parent-uid",
       "synced_at": 1781377869412
+    },
+    {
+      "id": "playwright-test-pupil",
+      "name": "Test Pupil",
+      "class_level": "Class 4",
+      "points": 10,
+      "streak_count": 1,
+      "last_active_date": "2026-06-13",
+      "badges_earned": [],
+      "synced_at": 1781385918860
+    },
+    {
+      "id": "verify-child-1781387517404",
+      "name": "Verify Parent Child",
+      "class_level": "Class 4",
+      "points": 40,
+      "streak_count": 1,
+      "last_active_date": "2026-06-13",
+      "badges_earned": [],
+      "parentId": "verify-parent-uid",
+      "synced_at": 1781387520446
     }
   ],
   "logs": [
+    {
+      "id": "sync-log-9rxkbxv",
+      "timestamp": 1781387520528,
+      "pupil_name": "Verify Parent Child",
+      "delta_points": 20,
+      "event_type": "Class 4 Sync Upload"
+    },
+    {
+      "id": "sync-log-mzo8g24",
+      "timestamp": 1781385918860,
+      "pupil_name": "Test Pupil",
+      "delta_points": 10,
+      "event_type": "Class 4 Sync Upload"
+    },
+    {
+      "id": "sync-log-v1t5gyw",
+      "timestamp": 1781385846644,
+      "pupil_name": "Test Pupil",
+      "delta_points": 10,
+      "event_type": "Class 4 Sync Upload"
+    },
+    {
+      "id": "sync-log-qprf3p3",
+      "timestamp": 1781385626872,
+      "pupil_name": "Test Pupil",
+      "delta_points": 10,
+      "event_type": "Class 4 Sync Upload"
+    },
     {
       "id": "sync-log-27jslrl",
       "timestamp": 1781377870066,

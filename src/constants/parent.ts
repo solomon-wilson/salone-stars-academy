@@ -9,12 +9,33 @@ export const CLASS_LEVELS = [
   "Class 6",
 ] as const
 
+/** Approximate SLL equivalent for pricing copy (static; no live FX in v1) */
+export const INDIVIDUAL_PRICE_USD = 19.99
+export const INDIVIDUAL_PRICE_SLL = 450_000
+export const TUTOR_SESSION_SLL_ANCHOR = 150_000
+
 export const PARENT_KRIO = {
   digestTitle: "Yu pikin progress — quick look",
   startPractice: "Start practice — pikin go learn alone",
   dailyPath: "Today homework quest",
   weeklyTopic: "Wetin school teach dis week?",
   upgradeCta: "Unlock daily path — less than private tutor",
+  streak: "Streak days",
+  starsWeek: "Stars dis week",
+  starsTotal: "Stars total",
+  lastActive: "Last active",
+  subjects: "Subjects attempted",
+  badges: "Badges earned",
+  syncOk: "Up to date",
+  syncPending: "Sync when online",
+  syncStale: "Long time since sync — connect Wi‑Fi",
+  weakAreas: "Need more practice",
+  weeklyEngagement: "Days practiced dis week",
+  todayDone: "Today quest done!",
+  todayPending: "Today quest not yet done",
+  wifiHint: "Wi‑Fi recommended for sync",
+  topicPreview: "Tomorrow quest go focus on",
+  celebration: "Pikin finish today homework — well done!",
 } as const
 
 export const getWeekKey = (date = new Date()): string => {

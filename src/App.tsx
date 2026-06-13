@@ -36,12 +36,21 @@ import { QuestGenerator } from "./features/teacher-pi/quest-generator"
 import { useTeacherMetrics } from "./features/teacher-pi/hooks/use-teacher-metrics"
 import { PricingModal } from "./features/billing/pricing-modal"
 import { ParentHomeView } from "./features/parent-home/parent-home-view"
+import { ChildPicker } from "./features/parent-home/child-picker"
 import {
   getChildCompletedKey,
   getChildProfileKey,
   loadChildCompletedQuests,
   loadChildProfile,
+  saveCompletionMeta,
 } from "./lib/daily-path"
+import {
+  markQuestCompleted,
+  recordAnswerAttempt,
+  summarizeSubjectStats,
+  loadQuestStats,
+} from "./lib/quest-stats"
+import { getPupilsForParent, type FirestorePupil } from "./firebaseDb"
 import { Quest, PupilProfile, UserProfile } from "./types"
 
 export default function App() {
@@ -67,6 +76,7 @@ export default function App() {
   const [activeChildId, setActiveChildId] = useState<string | null>(() =>
     localStorage.getItem("salone_stars_active_child_id")
   )
+  const [parentChildren, setParentChildren] = useState<FirestorePupil[]>([])
   const [showNetworkStatusModal, setShowNetworkStatusModal] = useState(false)
 
   // Pupil profile state
@@ -117,10 +127,21 @@ export default function App() {
       setProfile(profileUpdater)
       setUnsyncedPoints((prev) => prev + pointsDelta)
     },
-    onQuestComplete: (questId, pointsAward) => {
+    onQuestComplete: (questId, pointsAward, subject) => {
       setCompletedQuests((prev) => ({ ...prev, [questId]: true }))
       setProfile((prev) => ({ ...prev, points: prev.points + pointsAward }))
       setUnsyncedPoints((prev) => prev + pointsAward)
+      const childId = activeChildId || profile.id
+      markQuestCompleted(childId, questId, subject)
+      saveCompletionMeta(childId, questId, {
+        completedAt: new Date().toISOString().split("T")[0],
+        subject,
+        pointsAward,
+      })
+    },
+    onAnswerRecorded: (questId, subject, isCorrect) => {
+      const childId = activeChildId || profile.id
+      recordAnswerAttempt(childId, questId, subject, isCorrect)
     },
   })
 
@@ -141,6 +162,26 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("salone_stars_unsynced_points", unsyncedPoints.toString())
   }, [unsyncedPoints])
+
+  useEffect(() => {
+    const loadParentChildren = async () => {
+      if (userProfile?.role === "parent" && currentUser?.uid) {
+        const pupils = await getPupilsForParent(currentUser.uid)
+        setParentChildren(pupils)
+      } else {
+        setParentChildren([])
+      }
+    }
+    loadParentChildren()
+  }, [userProfile?.role, currentUser?.uid])
+
+  const handleSwitchParentChild = (child: FirestorePupil) => {
+    setActiveChildId(child.id)
+    localStorage.setItem("salone_stars_active_child_id", child.id)
+    setProfile(loadChildProfile(child.id, child.name, child.class_level))
+    setCompletedQuests(loadChildCompletedQuests(child.id))
+    quiz.exitQuest()
+  }
 
   const fetchQuestsFromLocalServer = async () => {
     setLoadingQuests(true)
@@ -366,6 +407,7 @@ export default function App() {
       setTimeout(async () => {
         setSyncMessage("Resolving conflicts using LWW monotonic timestamps...")
         try {
+          const subjectStats = summarizeSubjectStats(loadQuestStats(activeChildId || profile.id))
           const response = await fetch("/api/sync", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -379,6 +421,7 @@ export default function App() {
               badges_earned: profile.badges_earned,
               delta_points: unsyncedPoints,
               parentId: userProfile?.role === "parent" ? currentUser?.uid : undefined,
+              subject_stats: Object.keys(subjectStats).length > 0 ? subjectStats : undefined,
             }),
           })
 
@@ -526,6 +569,13 @@ export default function App() {
         {/* PUPIL PLAY TAB */}
         {activeTab === "pupil" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            {userProfile?.role === "parent" && parentChildren.length > 1 && (
+              <ChildPicker
+                children={parentChildren}
+                activeChildId={activeChildId}
+                onSelectChild={handleSwitchParentChild}
+              />
+            )}
 
             <div className="lg:col-span-1 space-y-6">
               <PupilProfileCard
@@ -609,6 +659,7 @@ export default function App() {
             onUpgrade={() => setPricingOpen(true)}
             onStartPractice={handleStartChildPractice}
             onRefreshQuests={fetchQuestsFromLocalServer}
+            onProfileUpdated={setUserProfile}
           />
         )}
 

@@ -1,6 +1,8 @@
 import { motion } from "motion/react"
 import { RefreshCw, Sparkles, Zap } from "lucide-react"
 import type { UserRole } from "../../types"
+import { BILLING_COPY } from "../../constants/billing"
+import { INDIVIDUAL_PRICE_USD } from "../../constants/parent"
 
 type PricingModalProps = {
   upgradingLoading: boolean
@@ -81,10 +83,23 @@ export const PricingModal = ({
             <div>
               <h4 className="text-xs font-black uppercase text-indigo-300 tracking-widest">{individualTitle}</h4>
               <div className="flex items-baseline space-x-1 mt-3 text-white">
-                <span className="text-3xl font-black">$19.99</span>
+                <span className="text-3xl font-black">${INDIVIDUAL_PRICE_USD}</span>
                 <span className="text-xs text-indigo-300 font-semibold">/ month</span>
               </div>
+              {isParent && (
+                <p className="text-[10px] text-indigo-400 mt-1">{BILLING_COPY.sllFootnote}</p>
+              )}
               <p className="text-[11px] text-indigo-300 mt-3 leading-relaxed">{individualCopy}</p>
+              {isParent && (
+                <ul className="mt-3 space-y-1">
+                  {BILLING_COPY.parentBullets.map(bullet => (
+                    <li key={bullet} className="text-[10px] text-indigo-400 flex items-start gap-1.5">
+                      <span className="text-indigo-500">•</span>
+                      {bullet}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
             <button
               type="button"
@@ -118,8 +133,11 @@ export const PricingModal = ({
           </div>
         </div>
 
-        <div className="bg-[#0f1233]/40 border border-[#1e1b4b] rounded-2xl p-4 text-xs text-indigo-300 font-medium">
-          Clicking upgrade opens a secure Stripe checkout. Your plan updates automatically after payment.
+        <div className="bg-[#0f1233]/40 border border-[#1e1b4b] rounded-2xl p-4 text-xs text-indigo-300 font-medium space-y-2">
+          <p>Clicking upgrade opens a secure Stripe checkout. Your plan updates automatically after payment.</p>
+          {isParent && (
+            <p className="text-[10px] text-indigo-400">{BILLING_COPY.mobileMoneyNote}</p>
+          )}
         </div>
       </motion.div>
     </div>
