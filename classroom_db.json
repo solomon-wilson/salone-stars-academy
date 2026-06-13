@@ -156,9 +156,79 @@
         "Bintumani Climber"
       ],
       "synced_at": 1781373630123
+    },
+    {
+      "id": "verify-pupil-1781374528093",
+      "name": "Verify Test Pupil",
+      "class_level": "Class 4",
+      "points": 100,
+      "streak_count": 2,
+      "last_active_date": "2026-06-13",
+      "badges_earned": [
+        "Bintumani Climber"
+      ],
+      "synced_at": 1781374528729
+    },
+    {
+      "id": "verify-pupil-1781377869936",
+      "name": "Verify Test Pupil",
+      "class_level": "Class 4",
+      "points": 100,
+      "streak_count": 2,
+      "last_active_date": "2026-06-13",
+      "badges_earned": [
+        "Bintumani Climber"
+      ],
+      "synced_at": 1781377870066
+    },
+    {
+      "id": "verify-child-1781377868277",
+      "name": "Verify Parent Child",
+      "class_level": "Class 4",
+      "points": 40,
+      "streak_count": 1,
+      "last_active_date": "2026-06-13",
+      "badges_earned": [],
+      "parentId": "verify-parent-uid",
+      "synced_at": 1781377869412
     }
   ],
   "logs": [
+    {
+      "id": "sync-log-27jslrl",
+      "timestamp": 1781377870066,
+      "pupil_name": "Verify Test Pupil",
+      "delta_points": 0,
+      "event_type": "Class 4 Sync Upload"
+    },
+    {
+      "id": "sync-log-me4z3y5",
+      "timestamp": 1781377870042,
+      "pupil_name": "Verify Test Pupil",
+      "delta_points": 20,
+      "event_type": "Class 4 Sync Upload"
+    },
+    {
+      "id": "sync-log-2795yfn",
+      "timestamp": 1781377869412,
+      "pupil_name": "Verify Parent Child",
+      "delta_points": 20,
+      "event_type": "Class 4 Sync Upload"
+    },
+    {
+      "id": "sync-log-bm50uh2",
+      "timestamp": 1781374528730,
+      "pupil_name": "Verify Test Pupil",
+      "delta_points": 0,
+      "event_type": "Class 4 Sync Upload"
+    },
+    {
+      "id": "sync-log-g6s2v4w",
+      "timestamp": 1781374528194,
+      "pupil_name": "Verify Test Pupil",
+      "delta_points": 20,
+      "event_type": "Class 4 Sync Upload"
+    },
     {
       "id": "sync-log-zbgkptt",
       "timestamp": 1781373630123,

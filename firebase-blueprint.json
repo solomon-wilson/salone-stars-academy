@@ -8,7 +8,7 @@
         "uid": { "type": "string" },
         "email": { "type": "string" },
         "name": { "type": "string" },
-        "role": { "type": "string", "enum": ["teacher", "pupil"] },
+        "role": { "type": "string", "enum": ["teacher", "pupil", "parent"] },
         "subscriptionPlan": { "type": "string", "enum": ["free", "individual", "team"] },
         "stripeCustomerId": { "type": "string" },
         "stripeSubscriptionStatus": { "type": "string" },
@@ -32,9 +32,10 @@
           "items": { "type": "string" }
         },
         "teacherId": { "type": "string" },
+        "parentId": { "type": "string" },
         "synced_at": { "type": "integer" }
       },
-      "required": ["id", "name", "class_level", "points", "teacherId"]
+      "required": ["id", "name", "class_level", "points"]
     },
     "Quest": {
       "title": "Quest",
@@ -71,6 +72,18 @@
         "updatedAt": { "type": "string" }
       },
       "required": ["id", "teacherId", "class_level", "alignedMbsseOutcome", "topics"]
+    },
+    "ParentWeeklyNote": {
+      "title": "ParentWeeklyNote",
+      "description": "Weekly school topic notes from parents for AI homework alignment.",
+      "type": "object",
+      "properties": {
+        "parentId": { "type": "string" },
+        "weekKey": { "type": "string" },
+        "topics": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["parentId", "weekKey", "topics", "updatedAt"]
     }
   },
   "firestore": {
@@ -89,6 +102,10 @@
     "/curriculums/{curriculumId}": {
       "schema": "Curriculum",
       "description": "Customized school schedules matching national MBSSE goals."
+    },
+    "/parent_notes/{noteId}": {
+      "schema": "ParentWeeklyNote",
+      "description": "Parent weekly topic notes for home homework alignment."
     }
   }
 }

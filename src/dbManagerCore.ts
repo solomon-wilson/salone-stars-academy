@@ -29,6 +29,7 @@ export interface SyncedPupil {
   badges_earned: string[]
   synced_at: number
   teacherId?: string
+  parentId?: string
 }
 
 export interface SyncLog {

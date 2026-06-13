@@ -8,8 +8,6 @@ import {
   updateDoc,
   query,
   where,
-  deleteDoc,
-  onSnapshot
 } from "firebase/firestore";
 
 export enum OperationType {
@@ -33,7 +31,6 @@ export interface FirestoreErrorInfo {
   };
 }
 
-// Mandatory JSON Firestore error formatter for self-diagnosis
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
@@ -54,7 +51,7 @@ export interface FirestoreUser {
   uid: string;
   email: string;
   name: string;
-  role: "teacher" | "pupil";
+  role: "teacher" | "pupil" | "parent";
   subscriptionPlan: "free" | "individual" | "team";
   stripeCustomerId?: string;
   stripeSubscriptionStatus?: string;
@@ -69,7 +66,8 @@ export interface FirestorePupil {
   streak_count: number;
   last_active_date: string;
   badges_earned: string[];
-  teacherId: string;
+  teacherId?: string;
+  parentId?: string;
   synced_at: number;
 }
 
@@ -86,6 +84,13 @@ export interface FirestoreQuest {
   alignedMbsseOutcome?: string;
 }
 
+export interface FirestoreParentNote {
+  parentId: string;
+  weekKey: string;
+  topics: string;
+  updatedAt: string;
+}
+
 export interface FirestoreCurriculum {
   id: string;
   teacherId: string;
@@ -97,7 +102,6 @@ export interface FirestoreCurriculum {
   updatedAt: string;
 }
 
-// ── USER PROFILE CRUD ──
 export async function getProfile(uid: string): Promise<FirestoreUser | null> {
   const path = `users/${uid}`;
   try {
@@ -114,10 +118,10 @@ export async function getProfile(uid: string): Promise<FirestoreUser | null> {
 }
 
 export async function createProfile(
-  uid: string, 
-  email: string, 
-  name: string, 
-  role: "teacher" | "pupil"
+  uid: string,
+  email: string,
+  name: string,
+  role: "teacher" | "pupil" | "parent"
 ): Promise<FirestoreUser> {
   const path = `users/${uid}`;
   const newUser: FirestoreUser = {
@@ -148,7 +152,6 @@ export async function updateProfile(uid: string, data: Partial<FirestoreUser>): 
   }
 }
 
-// ── PUPIL STREAK & STATS SYNC ──
 export async function syncPupil(pupil: FirestorePupil): Promise<void> {
   const path = `pupils/${pupil.id}`;
   try {
@@ -164,14 +167,63 @@ export async function getPupilsForTeacher(teacherId: string): Promise<FirestoreP
   try {
     const q = query(collection(db, "pupils"), where("teacherId", "==", teacherId));
     const snap = await getDocs(q);
-    return snap.docs.map(doc => doc.data() as FirestorePupil);
+    return snap.docs.map(d => d.data() as FirestorePupil);
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, path);
     return [];
   }
 }
 
-// ── QUESTS DB API ──
+export async function getPupilsForParent(parentId: string): Promise<FirestorePupil[]> {
+  const path = "pupils";
+  try {
+    const q = query(collection(db, "pupils"), where("parentId", "==", parentId));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => d.data() as FirestorePupil);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, path);
+    return [];
+  }
+}
+
+export async function linkChildToParent(pupil: FirestorePupil): Promise<void> {
+  const path = `pupils/${pupil.id}`;
+  try {
+    const docRef = doc(db, "pupils", pupil.id);
+    await setDoc(docRef, pupil);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
+  }
+}
+
+export async function saveParentWeeklyNote(note: FirestoreParentNote): Promise<void> {
+  const docId = `${note.parentId}_${note.weekKey}`;
+  const path = `parent_notes/${docId}`;
+  try {
+    const docRef = doc(db, "parent_notes", docId);
+    await setDoc(docRef, note);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function getParentWeeklyNote(
+  parentId: string,
+  weekKey: string
+): Promise<FirestoreParentNote | null> {
+  const docId = `${parentId}_${weekKey}`;
+  const path = `parent_notes/${docId}`;
+  try {
+    const docRef = doc(db, "parent_notes", docId);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) return snap.data() as FirestoreParentNote;
+    return null;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, path);
+    return null;
+  }
+}
+
 export async function createQuest(quest: FirestoreQuest): Promise<void> {
   const path = `quests/${quest.id}`;
   try {
@@ -186,14 +238,13 @@ export async function getQuests(): Promise<FirestoreQuest[]> {
   const path = "quests";
   try {
     const snap = await getDocs(collection(db, "quests"));
-    return snap.docs.map(doc => doc.data() as FirestoreQuest);
+    return snap.docs.map(d => d.data() as FirestoreQuest);
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, path);
     return [];
   }
 }
 
-// ── CUSTOM CURRICULUMS CREATOR ──
 export async function uploadCurriculum(curriculum: FirestoreCurriculum): Promise<void> {
   const path = `curriculums/${curriculum.id}`;
   try {
@@ -209,7 +260,7 @@ export async function getCurriculums(teacherId: string): Promise<FirestoreCurric
   try {
     const q = query(collection(db, "curriculums"), where("teacherId", "==", teacherId));
     const snap = await getDocs(q);
-    return snap.docs.map(doc => doc.data() as FirestoreCurriculum);
+    return snap.docs.map(d => d.data() as FirestoreCurriculum);
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, path);
     return [];

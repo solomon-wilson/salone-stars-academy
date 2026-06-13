@@ -70,6 +70,8 @@ export class LocalJsonAdapter implements DataPort {
         streak_count: Math.max(existing.streak_count, pupil.streak_count || 0),
         last_active_date: mergedDate,
         badges_earned: Array.from(new Set([...(existing.badges_earned || []), ...(pupil.badges_earned || [])])),
+        teacherId: pupil.teacherId || existing.teacherId,
+        parentId: pupil.parentId || existing.parentId,
         synced_at: Date.now(),
       }
     } else {
@@ -81,6 +83,8 @@ export class LocalJsonAdapter implements DataPort {
         streak_count: pupil.streak_count || 0,
         last_active_date: pupil.last_active_date || new Date().toISOString().split("T")[0],
         badges_earned: pupil.badges_earned || [],
+        teacherId: pupil.teacherId,
+        parentId: pupil.parentId,
         synced_at: Date.now(),
       })
     }

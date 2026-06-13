@@ -2,12 +2,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Global Safety Net (Zero Trust by default)
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Helper functions for auth state
     function isSignedIn() {
       return request.auth != null;
     }
@@ -36,7 +34,6 @@ service cloud.firestore {
       return incomingDate is string && incomingDate >= existingDate;
     }
 
-    // Grab Teacher user profile from database to verify subscription state
     function getUserProfile() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
@@ -48,12 +45,22 @@ service cloud.firestore {
       );
     }
 
-    // Strict validation schemas matching entities in firebase-blueprint.json
+    function hasValidPupilOwner(data) {
+      return (data.get('teacherId', '') is string && data.teacherId.size() > 0 && data.teacherId.size() <= 128)
+        || (data.get('parentId', '') is string && data.parentId.size() > 0 && data.parentId.size() <= 128);
+    }
+
+    function isPupilAuthority(data) {
+      return data.get('teacherId', '') == request.auth.uid
+        || data.get('parentId', '') == request.auth.uid
+        || data.id == request.auth.uid;
+    }
+
     function isValidUser(data) {
       return data.uid is string && data.uid.size() <= 128 &&
              data.email is string && data.email.size() <= 256 &&
              data.name is string && data.name.size() <= 128 &&
-             data.role in ["teacher", "pupil"] &&
+             data.role in ["teacher", "pupil", "parent"] &&
              data.subscriptionPlan in ["free", "individual", "team"];
     }
 
@@ -63,7 +70,7 @@ service cloud.firestore {
              data.class_level is string && data.class_level.size() <= 64 &&
              data.points is int && data.points >= 0 &&
              data.streak_count is int && data.streak_count >= 0 &&
-             data.teacherId is string && data.teacherId.size() <= 128 &&
+             hasValidPupilOwner(data) &&
              hasUniqueBadges(data.get('badges_earned', []));
     }
 
@@ -84,7 +91,13 @@ service cloud.firestore {
              data.topics is list && data.topics.size() <= 32;
     }
 
-    // Rules for User profiles
+    function isValidParentNote(data) {
+      return data.parentId is string && data.parentId.size() <= 128 &&
+             data.weekKey is string && data.weekKey.size() <= 32 &&
+             data.topics is string && data.topics.size() <= 500 &&
+             data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
     match /users/{userId} {
       allow get: if isOwner(userId);
       allow create: if isOwner(userId) && isValidUser(incoming()) &&
@@ -94,30 +107,27 @@ service cloud.firestore {
         incoming().uid == existing().uid &&
         incoming().role == existing().role &&
         incoming().createdAt == existing().createdAt &&
-        // Block client self-service premium and Stripe field writes
         incoming().subscriptionPlan == existing().subscriptionPlan &&
         incoming().stripeCustomerId == existing().stripeCustomerId &&
         incoming().stripeSubscriptionStatus == existing().stripeSubscriptionStatus;
     }
 
-    // Rules for Pupil performance
     match /pupils/{pupilId} {
-      allow get: if isSignedIn() && isValidId(pupilId) && (
-        existing().teacherId == request.auth.uid || existing().id == request.auth.uid
-      );
+      allow get: if isSignedIn() && isValidId(pupilId) && isPupilAuthority(existing());
       allow list: if false;
       allow create: if isSignedIn() && isValidId(pupilId) && isValidPupil(incoming()) &&
-        (incoming().teacherId == request.auth.uid || incoming().id == request.auth.uid);
-      allow update: if isSignedIn() && isValidId(pupilId) && isValidPupil(incoming()) && (
-        existing().teacherId == request.auth.uid || existing().id == request.auth.uid
-      ) && isMonotonicDate(
-        incoming().get('last_active_date', existing().last_active_date),
-        existing().get('last_active_date', '1970-01-01')
+        (incoming().teacherId == request.auth.uid || incoming().parentId == request.auth.uid || incoming().id == request.auth.uid);
+      allow update: if isSignedIn() && isValidId(pupilId) && isValidPupil(incoming()) &&
+        isPupilAuthority(existing()) &&
+        isMonotonicDate(
+          incoming().get('last_active_date', existing().last_active_date),
+          existing().get('last_active_date', '1970-01-01')
+        );
+      allow delete: if isSignedIn() && (
+        existing().teacherId == request.auth.uid || existing().parentId == request.auth.uid
       );
-      allow delete: if isSignedIn() && existing().teacherId == request.auth.uid;
     }
 
-    // Rules for Quests
     match /quests/{questId} {
       allow get, list: if true;
       allow create: if isSignedIn() && isValidId(questId) && isValidQuest(incoming()) &&
@@ -128,15 +138,28 @@ service cloud.firestore {
       allow delete: if isSignedIn() && existing().teacherId == request.auth.uid;
     }
 
-    // Rules for custom School Curriculums
     match /curriculums/{curriculumId} {
       allow get: if isSignedIn() && existing().teacherId == request.auth.uid;
       allow list: if false;
       allow create: if isSignedIn() && isValidId(curriculumId) && hasPremiumPlan() &&
-        isValidCurriculum(incoming()) && incoming().teacherId == request.auth.uid;
+        isValidCurriculum(incoming()) && incoming().teacherId == request.auth.uid &&
+        getUserProfile().role == "teacher";
       allow update: if isSignedIn() && hasPremiumPlan() && isValidCurriculum(incoming()) &&
-        existing().teacherId == request.auth.uid;
-      allow delete: if isSignedIn() && hasPremiumPlan() && existing().teacherId == request.auth.uid;
+        existing().teacherId == request.auth.uid && getUserProfile().role == "teacher";
+      allow delete: if isSignedIn() && hasPremiumPlan() && existing().teacherId == request.auth.uid &&
+        getUserProfile().role == "teacher";
+    }
+
+    match /parent_notes/{noteId} {
+      allow get: if isSignedIn() && existing().parentId == request.auth.uid;
+      allow list: if false;
+      allow create: if isSignedIn() && hasPremiumPlan() && isValidParentNote(incoming()) &&
+        incoming().parentId == request.auth.uid && getUserProfile().role == "parent";
+      allow update: if isSignedIn() && hasPremiumPlan() && isValidParentNote(incoming()) &&
+        existing().parentId == request.auth.uid && incoming().parentId == request.auth.uid &&
+        getUserProfile().role == "parent";
+      allow delete: if isSignedIn() && existing().parentId == request.auth.uid &&
+        getUserProfile().role == "parent";
     }
   }
 }

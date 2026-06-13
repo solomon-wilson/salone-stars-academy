@@ -40,6 +40,7 @@ export interface SyncedStudent {
   badges_earned: string[];
   synced_at: number;
   teacherId?: string;
+  parentId?: string;
 }
 
 export interface SyncLog {
@@ -61,11 +62,20 @@ export interface Curriculum {
   updatedAt: string;
 }
 
+export interface ParentWeeklyNote {
+  parentId: string;
+  weekKey: string;
+  topics: string;
+  updatedAt: string;
+}
+
+export type UserRole = "teacher" | "pupil" | "parent";
+
 export interface UserProfile {
   uid: string;
   email: string;
   name: string;
-  role: "teacher" | "pupil";
+  role: UserRole;
   subscriptionPlan: "free" | "individual" | "team";
   stripeCustomerId?: string;
   stripeSubscriptionStatus?: string;

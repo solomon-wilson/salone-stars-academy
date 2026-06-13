@@ -56,6 +56,13 @@ import { SyncConsole } from "./features/pupil-play/sync-console";
 import { PupilProfileCard } from "./features/pupil-play/pupil-profile-card";
 import { TeacherAuthForm } from "./features/teacher-pi/teacher-auth-form";
 import { PricingModal } from "./features/billing/pricing-modal";
+import { ParentHomeView } from "./features/parent-home/parent-home-view";
+import {
+  getChildCompletedKey,
+  getChildProfileKey,
+  loadChildCompletedQuests,
+  loadChildProfile,
+} from "./lib/daily-path";
 import { Question, Quest, PupilProfile, SyncedStudent, SyncLog, Curriculum, UserProfile } from "./types";
 
 export default function App() {
@@ -86,7 +93,10 @@ export default function App() {
   const [curriculumUploading, setCurriculumUploading] = useState(false);
 
   // Navigation / Mode Selectors
-  const [activeTab, setActiveTab] = useState<"pupil" | "teacher">("pupil");
+  const [activeTab, setActiveTab] = useState<"pupil" | "teacher" | "parent">("pupil");
+  const [activeChildId, setActiveChildId] = useState<string | null>(() =>
+    localStorage.getItem("salone_stars_active_child_id")
+  );
   const [showNetworkStatusModal, setShowNetworkStatusModal] = useState(false);
 
   // Pupil Profile State
@@ -151,13 +161,14 @@ export default function App() {
 
   // Persist Profile Change
   useEffect(() => {
-    localStorage.setItem("salone_stars_pupil_profile", JSON.stringify(profile));
-  }, [profile]);
+    const profileKey = activeChildId ? getChildProfileKey(activeChildId) : "salone_stars_pupil_profile";
+    localStorage.setItem(profileKey, JSON.stringify(profile));
+  }, [profile, activeChildId]);
 
-  // Persist Completed Quests List
   useEffect(() => {
-    localStorage.setItem("salone_stars_completed_quests", JSON.stringify(completedQuests));
-  }, [completedQuests]);
+    const completedKey = activeChildId ? getChildCompletedKey(activeChildId) : "salone_stars_completed_quests";
+    localStorage.setItem(completedKey, JSON.stringify(completedQuests));
+  }, [completedQuests, activeChildId]);
 
   // Persist Unsynced points count
   useEffect(() => {
@@ -280,6 +291,51 @@ export default function App() {
     }
   };
 
+  const handleParentAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError("");
+    if (!authEmail || !authPassword) {
+      setAuthError("Email and password are required.");
+      return;
+    }
+    try {
+      if (authTab === "login") {
+        await signInWithEmailAndPassword(auth, authEmail, authPassword);
+      } else {
+        if (!authFullName) {
+          setAuthError("Full name is required.");
+          return;
+        }
+        const userCredential = await createUserWithEmailAndPassword(auth, authEmail, authPassword);
+        const user = userCredential.user;
+        const newRes = await createProfile(user.uid, authEmail, authFullName, "parent");
+        setUserProfile({
+          uid: newRes.uid,
+          email: newRes.email,
+          name: newRes.name,
+          role: newRes.role,
+          subscriptionPlan: newRes.subscriptionPlan,
+          createdAt: newRes.createdAt,
+        });
+      }
+      setAuthEmail("");
+      setAuthPassword("");
+      setAuthFullName("");
+    } catch (err: any) {
+      console.error(err);
+      setAuthError(err.message || "Failed to authenticate.");
+    }
+  };
+
+  const handleStartChildPractice = (child: { id: string; name: string; class_level: string }) => {
+    setActiveChildId(child.id);
+    localStorage.setItem("salone_stars_active_child_id", child.id);
+    setProfile(loadChildProfile(child.id, child.name, child.class_level));
+    setCompletedQuests(loadChildCompletedQuests(child.id));
+    setActiveTab("pupil");
+    setActiveQuest(null);
+  };
+
   const handleSignOut = async () => {
     try {
       await signOut(auth);
@@ -291,9 +347,10 @@ export default function App() {
 
   const handleUpgradeClick = async (plan: "individual" | "team") => {
     if (!currentUser) {
-      alert("Please sign in or create a teacher account to subscribe.");
+      alert("Please sign in to subscribe.");
       return;
     }
+    const subscriberRole = userProfile?.role === "parent" || activeTab === "parent" ? "parent" : "teacher";
     setUpgradingLoading(true);
     try {
       const resp = await apiFetch("/api/billing/checkout", {
@@ -302,6 +359,7 @@ export default function App() {
           userId: currentUser.uid,
           email: currentUser.email,
           planName: plan,
+          subscriberRole,
         }),
       });
       if (resp.ok) {
@@ -420,7 +478,8 @@ export default function App() {
               streak_count: profile.streak_count,
               last_active_date: profile.last_active_date,
               badges_earned: profile.badges_earned,
-              delta_points: unsyncedPoints
+              delta_points: unsyncedPoints,
+              parentId: userProfile?.role === "parent" ? currentUser?.uid : undefined,
             })
           });
 
@@ -690,6 +749,21 @@ export default function App() {
               >
                 <Cpu className="h-4 w-4" />
                 <span>🎓 Teacher Pi</span>
+              </button>
+              <button
+                id="tab-parent"
+                onClick={() => {
+                  setActiveTab("parent");
+                  setActiveQuest(null);
+                }}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition text-sm font-medium cursor-pointer ${
+                  activeTab === "parent"
+                    ? "bg-indigo-600 text-white shadow-[0_0_15px_rgba(99,102,241,0.4)] border border-indigo-400/30 font-bold"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <Heart className="h-4 w-4" />
+                <span>🏠 Parent Home</span>
               </button>
             </div>
 
@@ -1085,6 +1159,27 @@ export default function App() {
         )}
 
         {/* 2. TEACHER PI SYNCHRONIZE & CONTROL LEDGER TAB */}
+        {activeTab === "parent" && (
+          <ParentHomeView
+            currentUser={currentUser}
+            userProfile={userProfile}
+            authTab={authTab}
+            authEmail={authEmail}
+            authPassword={authPassword}
+            authFullName={authFullName}
+            authError={authError}
+            quests={questsList}
+            onAuthTabChange={setAuthTab}
+            onAuthEmailChange={setAuthEmail}
+            onAuthPasswordChange={setAuthPassword}
+            onAuthFullNameChange={setAuthFullName}
+            onParentAuthSubmit={handleParentAuthSubmit}
+            onUpgrade={() => setPricingOpen(true)}
+            onStartPractice={handleStartChildPractice}
+            onRefreshQuests={fetchQuestsFromLocalServer}
+          />
+        )}
+
         {activeTab === "teacher" && (
           !currentUser ? (
             <TeacherAuthForm
@@ -1618,6 +1713,7 @@ export default function App() {
       {pricingOpen && (
         <PricingModal
           upgradingLoading={upgradingLoading}
+          viewerRole={userProfile?.role ?? (activeTab === "parent" ? "parent" : "teacher")}
           onClose={() => setPricingOpen(false)}
           onUpgrade={handleUpgradeClick}
         />

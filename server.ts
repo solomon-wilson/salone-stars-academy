@@ -1,15 +1,15 @@
 import express from "express"
 import path from "path"
 import dotenv from "dotenv"
-import { createServer as createViteServer } from "vite"
 import { GoogleGenAI, Type } from "@google/genai"
 import Stripe from "stripe"
 import { DatabaseManager, Quest } from "./src/dbManager"
 import { requireAuth, optionalAuth, AuthenticatedRequest } from "./src/server/authMiddleware"
-import { geminiRateLimiter } from "./src/server/rateLimiter"
+import { geminiRateLimiter, parentHomeworkRateLimiter } from "./src/server/rateLimiter"
 import {
   handleCheckoutCompleted,
   handleSubscriptionDeleted,
+  handlePaymentFailed,
   processBillingSuccessRedirect,
 } from "./src/server/billingService"
 
@@ -52,6 +52,9 @@ app.post(
           break
         case "customer.subscription.deleted":
           await handleSubscriptionDeleted(event.data.object as Stripe.Subscription)
+          break
+        case "invoice.payment_failed":
+          await handlePaymentFailed(event.data.object as Stripe.Invoice)
           break
         default:
           break
@@ -110,7 +113,7 @@ app.get("/api/quests", async (_req, res) => {
 
 app.post("/api/sync", optionalAuth, async (req: AuthenticatedRequest, res) => {
   try {
-    const { id, name, class_level, points, streak_count, last_active_date, badges_earned, delta_points } = req.body
+    const { id, name, class_level, points, streak_count, last_active_date, badges_earned, delta_points, parentId } = req.body
     if (!id || !name) {
       return res.status(400).json({ error: "Pupil ID and Name are required for sync." })
     }
@@ -125,6 +128,7 @@ app.post("/api/sync", optionalAuth, async (req: AuthenticatedRequest, res) => {
         last_active_date,
         badges_earned,
         teacherId: req.firebaseUser?.uid,
+        parentId: parentId || undefined,
       },
       delta_points || 0
     )
@@ -145,7 +149,7 @@ app.get("/api/teacher/students", requireAuth, async (_req, res) => {
 
 app.post("/api/billing/checkout", requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
-    const { userId, planName, email } = req.body
+    const { userId, planName, email, subscriberRole } = req.body
     if (!userId || !planName) {
       return res.status(400).json({ error: "Missing required checkout parameters." })
     }
@@ -163,10 +167,18 @@ app.post("/api/billing/checkout", requireAuth, async (req: AuthenticatedRequest,
       return res.json({ url: sandboxUrl, simulated: true })
     }
 
+    const role = subscriberRole === "parent" ? "parent" : "teacher"
     const amount = planName === "team" ? 9999 : 1999
     const displayTitle = planName === "team"
       ? "SSA Team Plan (School Owners)"
-      : "SSA Individual Plan (Private Teachers)"
+      : role === "parent"
+        ? "SSA Individual Plan (Home Tutor Replacement)"
+        : "SSA Individual Plan (Private Lesson Toolkit)"
+    const description = planName === "team"
+      ? "Monthly team access for schools with up to 25 teacher licenses."
+      : role === "parent"
+        ? "Home learning support — daily MBSSE-aligned practice for your child."
+        : "Monthly access for private teachers with custom curriculum and AI quests."
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
@@ -175,7 +187,7 @@ app.post("/api/billing/checkout", requireAuth, async (req: AuthenticatedRequest,
           currency: "usd",
           product_data: {
             name: displayTitle,
-            description: "Monthly access subscription to custom curricula aligned with MBSSE standards.",
+            description,
           },
           unit_amount: amount,
           recurring: { interval: "month" },
@@ -184,7 +196,7 @@ app.post("/api/billing/checkout", requireAuth, async (req: AuthenticatedRequest,
       }],
       mode: "subscription",
       client_reference_id: userId,
-      metadata: { userId, plan: planName },
+      metadata: { userId, plan: planName, subscriberRole: role },
       success_url: `${origin}/api/billing/success?userId=${encodeURIComponent(userId)}&plan=${encodeURIComponent(planName)}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/?billing-cancelled=true`,
       customer_email: email,
@@ -324,8 +336,106 @@ app.post("/api/teacher/generate-quest", requireAuth, async (req: AuthenticatedRe
   }
 })
 
+app.post("/api/parent/generate-homework", requireAuth, async (req: AuthenticatedRequest, res) => {
+  try {
+    const rateKey = `parent-${req.firebaseUser?.uid || req.ip}`
+    if (!parentHomeworkRateLimiter(rateKey)) {
+      return res.status(429).json({ error: "Rate limit exceeded. Max 5 homework generations per day." })
+    }
+
+    const { pupilId, class_level, topics, subject } = req.body
+    if (!pupilId || !class_level || !topics) {
+      return res.status(400).json({ error: "pupilId, class_level, and topics are required." })
+    }
+    if (typeof topics !== "string" || topics.length > 500) {
+      return res.status(400).json({ error: "topics must be a string of 500 characters or fewer." })
+    }
+
+    const ai = getGemini()
+    const prompt = `Create a realistic K-12 primary school homework quest for Sierra Leone's MBSSE National Syllabus.
+      Parameters:
+      - Subject: ${subject || "Mixed"}
+      - Class/Level: ${class_level}
+      - Parent weekly topic note: ${topics}
+      
+      Requirements for exactly 2 questions:
+      - Align with the parent's weekly topic note.
+      - Culturally relevant Sierra Leone context.
+      - Include pedagogical explanations.
+      - Each question needs a 'krioInstruction' in Sierra Leonean Krio.
+      - Reject gibberish topics; if topics are nonsense, use general MBSSE ${class_level} revision instead.
+
+      Generate clean structured JSON adhering strictly to the response schema.`
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          required: ["title", "points_award", "difficulty", "questions"],
+          properties: {
+            title: { type: Type.STRING },
+            points_award: { type: Type.INTEGER },
+            difficulty: { type: Type.STRING },
+            questions: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                required: ["questionText", "options", "correctOption", "explanation", "krioInstruction"],
+                properties: {
+                  questionText: { type: Type.STRING },
+                  options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  correctOption: { type: Type.STRING },
+                  explanation: { type: Type.STRING },
+                  krioInstruction: { type: Type.STRING },
+                },
+              },
+            },
+          },
+        },
+      },
+    })
+
+    const outputText = response.text
+    if (!outputText) throw new Error("No text output received from AI.")
+    const draft = JSON.parse(outputText.trim())
+    res.json({
+      ...draft,
+      subject: subject || "Mixed",
+      class_level,
+      pupilId,
+    })
+  } catch (error: any) {
+    console.error("Parent homework generation error:", error)
+    res.status(500).json({ error: error.message || "Failed to generate homework quest." })
+  }
+})
+
+app.post("/api/parent/publish-homework", requireAuth, async (req: AuthenticatedRequest, res) => {
+  try {
+    const newQuest = req.body
+    if (!newQuest.title || !newQuest.class_level || !newQuest.questions?.length) {
+      return res.status(400).json({ error: "Invalid homework quest structure." })
+    }
+    const questWithMeta: Quest = {
+      ...newQuest,
+      id: newQuest.id || `q-home-${Math.random().toString(36).substring(2, 9)}`,
+      subject: newQuest.subject || "Mixed",
+      source: "generated",
+      teacherId: req.firebaseUser?.uid,
+    }
+    await db.publishQuest(questWithMeta)
+    res.json({ success: true, quest: questWithMeta })
+  } catch {
+    res.status(500).json({ error: "Failed to publish homework quest." })
+  }
+})
+
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite")
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -357,4 +467,8 @@ async function startServer() {
   })
 }
 
-startServer()
+export { app }
+
+if (!process.env.VERCEL) {
+  startServer()
+}

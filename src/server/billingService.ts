@@ -1,5 +1,5 @@
 import Stripe from "stripe"
-import { updateUserSubscription } from "./firebaseAdmin"
+import { updateUserSubscription, getFirestoreAdmin } from "./firebaseAdmin"
 
 export const handleCheckoutCompleted = async (
   stripe: Stripe,
@@ -35,6 +35,29 @@ export const handleSubscriptionDeleted = async (
     stripeSubscriptionStatus: "cancelled",
   })
   console.log(`[Billing Webhook] Downgraded user ${userId} to free`)
+}
+
+export const handlePaymentFailed = async (
+  invoice: Stripe.Invoice
+): Promise<void> => {
+  const customerId = typeof invoice.customer === "string" ? invoice.customer : null
+  if (!customerId) return
+
+  const firestore = getFirestoreAdmin()
+  if (!firestore) return
+
+  const snap = await firestore.collection("users")
+    .where("stripeCustomerId", "==", customerId)
+    .limit(1)
+    .get()
+
+  if (snap.empty) {
+    console.warn(`[Billing Webhook] No user found for customer ${customerId}`)
+    return
+  }
+
+  await snap.docs[0].ref.update({ stripeSubscriptionStatus: "past_due" })
+  console.log(`[Billing Webhook] Payment failed — user ${snap.docs[0].id} marked past_due`)
 }
 
 export const processBillingSuccessRedirect = async (

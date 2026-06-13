@@ -19,3 +19,4 @@ export const createRateLimiter = (maxRequests: number, windowMs: number) => {
 }
 
 export const geminiRateLimiter = createRateLimiter(10, 60 * 60 * 1000)
+export const parentHomeworkRateLimiter = createRateLimiter(5, 24 * 60 * 60 * 1000)

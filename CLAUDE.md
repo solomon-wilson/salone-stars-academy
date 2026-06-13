@@ -12,11 +12,12 @@ npm run lint             # TypeScript type-check only (tsc --noEmit)
 npm run clean            # Remove dist/ and server.js
 npm run verify:sync      # Verify sync API + LWW merge (server must be running)
 npm run verify:publish   # Verify quest publish validation
+npm run verify:parent    # Verify parent sync + protected homework API
 ```
 
 ## Architecture Overview
 
-**Salone Stars Academy** is an offline-first, gamified LMS for Sierra Leonean primary schools. Two UI modes in one SPA: **Pupil Play** and **Teacher Pi**.
+**Salone Stars Academy** is an offline-first, gamified LMS for Sierra Leonean primary schools. Three UI modes in one SPA: **Pupil Play**, **Teacher Pi**, and **Parent Home**.
 
 ### Server (`server.ts`)
 
@@ -26,11 +27,13 @@ Express API + static host. Protected routes use Firebase ID token via `requireAu
 |---|---|---|
 | `GET /health` | None | Health check + deployment mode |
 | `GET /api/quests` | None | Quest catalog |
-| `POST /api/sync` | Optional | LWW pupil merge |
+| `POST /api/sync` | Optional | LWW pupil merge (supports `parentId`) |
 | `GET /api/teacher/students` | Required | Leaderboard + sync logs |
 | `POST /api/teacher/generate-quest` | Required | Gemini AI (rate-limited 10/hr) |
 | `POST /api/teacher/publish-quest` | Required | Publish quest (needs subject + class_level) |
-| `POST /api/billing/checkout` | Required | Stripe Checkout |
+| `POST /api/parent/generate-homework` | Required | Gemini homework draft (5/day/parent) |
+| `POST /api/parent/publish-homework` | Required | Parent-approved homework quest |
+| `POST /api/billing/checkout` | Required | Stripe Checkout (`subscriberRole: parent\|teacher`) |
 | `GET /api/billing/success` | None | Redirect handler → updates Firestore subscription |
 | `POST /api/billing/webhook` | Stripe sig | Webhook for checkout.session.completed |
 
@@ -45,7 +48,8 @@ Seed data lives in `src/dbManagerCore.ts`. Server types duplicate frontend types
 
 ### Billing
 
-- Checkout sends `{ userId, planName, email }` — NOT `plan` / `userEmail`
+- Checkout sends `{ userId, planName, email, subscriberRole }` — NOT `plan` / `userEmail`
+- Individual $19.99 is dual-audience: **parent** (home tutor replacement) and **teacher** (private lesson toolkit)
 - `subscriptionPlan` is updated via Firebase Admin SDK only (webhook + success redirect)
 - Never call client `updateProfile({ subscriptionPlan })` — Firestore rules block it
 
@@ -53,11 +57,14 @@ Seed data lives in `src/dbManagerCore.ts`. Server types duplicate frontend types
 
 ```
 src/
-  App.tsx                    # Main state + orchestration (being modularized)
+  App.tsx                    # Main shell + tab orchestration
   features/pupil-play/       # BadgesCabinet, SyncConsole, hooks
+  features/teacher-pi/         # Teacher auth form
+  features/parent-home/        # Parent auth, child linking, digest, daily path
+  features/billing/          # Role-aware pricing modal
   shared/ui/                 # GlassCard, AppBackground, ErrorBoundary
-  lib/                       # api-client, tts, subject-colors
-  firebaseDb.ts              # Client Firestore CRUD (profiles, curriculums)
+  lib/                       # api-client, tts, subject-colors, daily-path
+  firebaseDb.ts              # Client Firestore CRUD (profiles, pupils, parent_notes)
 ```
 
 Use `apiFetch()` from `src/lib/api-client.ts` for authenticated API calls.
@@ -67,6 +74,9 @@ Use `apiFetch()` from `src/lib/api-client.ts` for authenticated API calls.
 - Quest publish must include `subject` and `class_level` from AI form fields
 - No demo credential bypass or client-side premium simulation
 - CORS in production uses `APP_URL`, not `*`
+- Parent Individual plan: max 3 linked children (`MAX_PARENT_CHILDREN` in `src/constants/parent.ts`)
+- Home pupils use `parentId` on Firestore pupil docs; sync passes `parentId` in `/api/sync` body
+- Curriculum upload remains **teacher-only**; parents use daily path + AI homework instead
 
 ## Configuration
 
@@ -78,4 +88,6 @@ See `DESIGN_SYSTEM_REFERENCE.md`. Use `<GlassCard>` from `src/shared/ui/` for ca
 
 ## Firestore Security
 
-`firestore.rules` — client cannot self-upgrade subscription; pupil list requires teacher-scoped queries; `isValidId()` enforced on pupil IDs.
+`firestore.rules` — client cannot self-upgrade subscription; pupils scoped by `teacherId` or `parentId`; `parent_notes` require premium parent role; `isValidId()` enforced on pupil IDs.
+
+See `PRD.md` for Phase 5 Parent Home requirements (PA-01–PA-10, B-06–B-09).
