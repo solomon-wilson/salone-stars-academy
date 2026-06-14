@@ -1,7 +1,7 @@
 import fs from "fs"
 import path from "path"
 import type { Quest, SyncedPupil, SyncLog, PupilInvite } from "../dbManagerCore"
-import type { DataPort } from "./ports"
+import type { DataPort, QuestPage } from "./ports"
 
 const DB_FILE = path.join(process.cwd(), "classroom_db.json")
 
@@ -52,6 +52,17 @@ export class LocalJsonAdapter implements DataPort {
 
   async getQuests(): Promise<Quest[]> {
     return this.cache.quests
+  }
+
+  async getQuestsByFilter(classLevel?: string, subject?: string, cursor?: string, limit = 50): Promise<QuestPage> {
+    let result = this.cache.quests
+    if (classLevel) result = result.filter(q => q.class_level === classLevel)
+    if (subject) result = result.filter(q => q.subject === subject)
+    const cap = Math.min(limit, 200)
+    const startIdx = cursor ? result.findIndex(q => q.id === cursor) + 1 : 0
+    const page = result.slice(startIdx, startIdx + cap)
+    const nextCursor = startIdx + cap < result.length ? page[page.length - 1]?.id ?? null : null
+    return { quests: page, nextCursor }
   }
 
   async publishQuest(quest: Quest): Promise<void> {
@@ -122,6 +133,22 @@ export class LocalJsonAdapter implements DataPort {
 
     this.saveToDisk()
     return this.cache.pupils.sort((a, b) => b.points - a.points)
+  }
+
+  async syncPupilBatch(
+    pupils: Array<Partial<SyncedPupil> & { id: string; name: string }>,
+    _actorUid: string
+  ): Promise<Array<{ pupilId: string; success: boolean; error?: string }>> {
+    const results: Array<{ pupilId: string; success: boolean; error?: string }> = []
+    for (const pupil of pupils.slice(0, 50)) {
+      try {
+        await this.syncPupil(pupil, 0)
+        results.push({ pupilId: pupil.id, success: true })
+      } catch (err) {
+        results.push({ pupilId: pupil.id, success: false, error: err instanceof Error ? err.message : "Unknown error" })
+      }
+    }
+    return results
   }
 
   async getStudentsAndLogs(): Promise<{ students: SyncedPupil[]; logs: SyncLog[] }> {

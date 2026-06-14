@@ -1,4 +1,4 @@
-import { RefreshCw, Sparkles } from "lucide-react"
+import { BookOpen } from "lucide-react"
 import { GlassCard } from "../../shared/ui/glass-card"
 import { PARENT_KRIO } from "../../constants/parent"
 
@@ -6,24 +6,18 @@ type WeeklyTopicFormProps = {
   topics: string
   isPremium: boolean
   saving: boolean
-  generating: boolean
-  generatedTitle: string | null
   onTopicsChange: (value: string) => void
   onSaveTopics: () => void
-  onGenerateHomework: () => void
-  onApproveHomework: () => void
+  onOpenBankBrowser: () => void
 }
 
 export const WeeklyTopicForm = ({
   topics,
   isPremium,
   saving,
-  generating,
-  generatedTitle,
   onTopicsChange,
   onSaveTopics,
-  onGenerateHomework,
-  onApproveHomework,
+  onOpenBankBrowser,
 }: WeeklyTopicFormProps) => (
   <GlassCard className="p-6 space-y-4">
     <div>
@@ -53,30 +47,17 @@ export const WeeklyTopicForm = ({
       </button>
       <button
         type="button"
-        onClick={onGenerateHomework}
-        disabled={!isPremium || generating || !topics.trim()}
-        className="flex-1 flex items-center justify-center space-x-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-widest py-3 rounded-xl cursor-pointer transition"
+        onClick={onOpenBankBrowser}
+        disabled={!isPremium}
+        className="flex-1 flex items-center justify-center space-x-2 bg-indigo-700 hover:bg-indigo-600 disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-widest py-3 rounded-xl cursor-pointer transition"
       >
-        {generating ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-        <span>{generating ? "Generating..." : "AI Homework Draft"}</span>
+        <BookOpen className="h-4 w-4" />
+        <span>Browse Question Bank</span>
       </button>
     </div>
 
-    {generatedTitle && (
-      <div className="bg-emerald-950/20 border border-emerald-800/40 rounded-xl p-4 space-y-3">
-        <p className="text-xs text-emerald-300 font-bold">Draft ready: {generatedTitle}</p>
-        <button
-          type="button"
-          onClick={onApproveHomework}
-          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase tracking-widest py-2.5 rounded-xl cursor-pointer transition"
-        >
-          Approve for Child
-        </button>
-      </div>
-    )}
-
     {!isPremium && (
-      <p className="text-[11px] text-indigo-400">Premium Individual plan unlocks weekly topic notes and AI homework.</p>
+      <p className="text-[11px] text-indigo-400">Premium Individual plan unlocks weekly topic notes and the Question Bank.</p>
     )}
   </GlassCard>
 )

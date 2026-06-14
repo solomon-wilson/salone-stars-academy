@@ -1,5 +1,7 @@
 import admin from "firebase-admin"
-import { getFirestore } from "firebase-admin/firestore"
+import { getFirestore, FieldValue } from "firebase-admin/firestore"
+
+export { FieldValue }
 
 let initialized = false
 

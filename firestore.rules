@@ -39,10 +39,27 @@ service cloud.firestore {
     }
 
     function hasPremiumPlan() {
+      let profile = getUserProfile();
       return isSignedIn() && (
-        getUserProfile().subscriptionPlan == "individual" || 
-        getUserProfile().subscriptionPlan == "team"
+        profile.subscriptionPlan == "individual" ||
+        profile.subscriptionPlan == "team"
       );
+    }
+
+    function hasTeacherPremiumPlan() {
+      let profile = getUserProfile();
+      return isSignedIn() &&
+        profile.get('role', '') == 'teacher' &&
+        (profile.get('subscriptionPlan', '') == 'individual' ||
+         profile.get('subscriptionPlan', '') == 'team');
+    }
+
+    function hasParentPremiumPlan() {
+      let profile = getUserProfile();
+      return isSignedIn() &&
+        profile.get('role', '') == 'parent' &&
+        (profile.get('subscriptionPlan', '') == 'individual' ||
+         profile.get('subscriptionPlan', '') == 'team');
     }
 
     function hasValidPupilOwner(data) {
@@ -143,25 +160,39 @@ service cloud.firestore {
     match /curriculums/{curriculumId} {
       allow get: if isSignedIn() && existing().teacherId == request.auth.uid;
       allow list: if false;
-      allow create: if isSignedIn() && isValidId(curriculumId) && hasPremiumPlan() &&
-        isValidCurriculum(incoming()) && incoming().teacherId == request.auth.uid &&
-        getUserProfile().role == "teacher";
-      allow update: if isSignedIn() && hasPremiumPlan() && isValidCurriculum(incoming()) &&
-        existing().teacherId == request.auth.uid && getUserProfile().role == "teacher";
-      allow delete: if isSignedIn() && hasPremiumPlan() && existing().teacherId == request.auth.uid &&
-        getUserProfile().role == "teacher";
+      allow create: if hasTeacherPremiumPlan() && isValidId(curriculumId) &&
+        isValidCurriculum(incoming()) && incoming().teacherId == request.auth.uid;
+      allow update: if hasTeacherPremiumPlan() && isValidCurriculum(incoming()) &&
+        existing().teacherId == request.auth.uid;
+      allow delete: if hasTeacherPremiumPlan() && existing().teacherId == request.auth.uid;
     }
 
     match /parent_notes/{noteId} {
       allow get: if isSignedIn() && existing().parentId == request.auth.uid;
       allow list: if false;
-      allow create: if isSignedIn() && hasPremiumPlan() && isValidParentNote(incoming()) &&
-        incoming().parentId == request.auth.uid && getUserProfile().role == "parent";
-      allow update: if isSignedIn() && hasPremiumPlan() && isValidParentNote(incoming()) &&
-        existing().parentId == request.auth.uid && incoming().parentId == request.auth.uid &&
-        getUserProfile().role == "parent";
+      allow create: if hasParentPremiumPlan() && isValidParentNote(incoming()) &&
+        incoming().parentId == request.auth.uid;
+      allow update: if hasParentPremiumPlan() && isValidParentNote(incoming()) &&
+        existing().parentId == request.auth.uid && incoming().parentId == request.auth.uid;
       allow delete: if isSignedIn() && existing().parentId == request.auth.uid &&
         getUserProfile().role == "parent";
+    }
+
+    // Server-only collections — Admin SDK writes via Express API
+    match /api_keys/{keyId} {
+      allow read, write: if false;
+    }
+
+    match /audit_logs/{logId} {
+      allow read, write: if false;
+    }
+
+    match /webhooks/{webhookId} {
+      allow read, write: if false;
+    }
+
+    match /webhook_logs/{logId} {
+      allow read, write: if false;
     }
   }
 }

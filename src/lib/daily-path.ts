@@ -169,8 +169,9 @@ export const pickFallbackDefaultQuest = (
   quests: Quest[],
   classLevel: string
 ): Quest | null => {
-  const defaults = quests.filter(q => q.source === "default" && q.class_level === classLevel)
-  if (defaults.length > 0) return defaults[0]
-  const anyClass = quests.filter(q => q.source === "default")
+  const isSeeded = (q: Quest) => q.source === "default" || q.source === "bank"
+  const classMatches = quests.filter(q => isSeeded(q) && q.class_level === classLevel)
+  if (classMatches.length > 0) return classMatches[0]
+  const anyClass = quests.filter(isSeeded)
   return anyClass[0] ?? quests[0] ?? null
 }

@@ -14,9 +14,16 @@ export interface Quest {
   points_award: number;
   difficulty: string;
   questions: Question[];
-  source: "default" | "generated";
+  source: "default" | "generated" | "bank" | "parent-pack";
   teacherId?: string;
   alignedMbsseOutcome?: string;
+}
+
+export interface SholaMessage {
+  role: "shola" | "pupil";
+  content: string;
+  timestamp: string;
+  xpAwarded?: number;
 }
 
 export interface PupilProfile {

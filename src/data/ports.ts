@@ -1,12 +1,22 @@
 import type { Quest, SyncedPupil, SyncLog } from "../dbManagerCore"
 
+export interface QuestPage {
+  quests: Quest[]
+  nextCursor: string | null
+}
+
 export interface DataPort {
   getQuests(): Promise<Quest[]>
+  getQuestsByFilter(classLevel?: string, subject?: string, cursor?: string, limit?: number): Promise<QuestPage>
   publishQuest(quest: Quest): Promise<void>
   syncPupil(
     pupil: Partial<SyncedPupil> & { id: string; name: string },
     deltaPoints?: number
   ): Promise<SyncedPupil[]>
+  syncPupilBatch(
+    pupils: Array<Partial<SyncedPupil> & { id: string; name: string }>,
+    actorUid: string
+  ): Promise<Array<{ pupilId: string; success: boolean; error?: string }>>
   getStudentsAndLogs(): Promise<{ students: SyncedPupil[]; logs: SyncLog[] }>
 }
 

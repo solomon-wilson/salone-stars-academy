@@ -51,6 +51,10 @@ export class DatabaseManager {
     return this.adapter.getQuests()
   }
 
+  public async getQuestsByFilter(classLevel?: string, subject?: string, cursor?: string, limit?: number) {
+    return this.adapter.getQuestsByFilter(classLevel, subject, cursor, limit)
+  }
+
   public async publishQuest(quest: Quest): Promise<void> {
     return this.adapter.publishQuest(quest)
   }
@@ -60,6 +64,13 @@ export class DatabaseManager {
     deltaPoints = 0
   ): Promise<SyncedPupil[]> {
     return this.adapter.syncPupil(pupil, deltaPoints)
+  }
+
+  public async syncPupilBatch(
+    pupils: Array<Partial<SyncedPupil> & { id: string; name: string }>,
+    actorUid: string
+  ) {
+    return this.adapter.syncPupilBatch(pupils, actorUid)
   }
 
   public async getStudentsAndLogs(): Promise<{ students: SyncedPupil[]; logs: SyncLog[] }> {

@@ -1,5 +1,5 @@
 import { motion } from "motion/react"
-import { RefreshCw, Book, Play, CheckCircle2, Sparkles } from "lucide-react"
+import { RefreshCw, Book, Play, CheckCircle2, Sparkles, MessageCircle } from "lucide-react"
 import type { Quest, PupilProfile } from "../../types"
 
 type QuestListProps = {
@@ -8,9 +8,10 @@ type QuestListProps = {
   completedQuests: Record<string, boolean>
   loadingQuests: boolean
   onStartQuest: (quest: Quest) => void
+  onStudyWithShola?: (quest: Quest) => void
 }
 
-export const QuestList = ({ quests, profile, completedQuests, loadingQuests, onStartQuest }: QuestListProps) => {
+export const QuestList = ({ quests, profile, completedQuests, loadingQuests, onStartQuest, onStudyWithShola }: QuestListProps) => {
   const filtered = quests.filter((q) => q.class_level === profile.class_level)
 
   return (
@@ -86,17 +87,29 @@ export const QuestList = ({ quests, profile, completedQuests, loadingQuests, onS
                     <Sparkles className="h-4 w-4 text-yellow-400" />
                     <span className="text-xs font-black text-yellow-500 font-mono">{quest.points_award} Stars Award</span>
                   </div>
-                  <button
-                    onClick={() => onStartQuest(quest)}
-                    className={`px-5 py-2.5 rounded-xl text-xs font-black transition uppercase tracking-wider flex items-center space-x-1.5 cursor-pointer ${
-                      isCompleted
-                        ? "bg-[#05060f] hover:bg-[#0f1233] text-indigo-400 border border-indigo-900/50"
-                        : "bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-950/20"
-                    }`}
-                  >
-                    <Play className="h-3 w-3 fill-current" />
-                    <span>{isCompleted ? "Redo" : "Learn Now"}</span>
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    {onStudyWithShola && (
+                      <button
+                        onClick={() => onStudyWithShola(quest)}
+                        className="px-3 py-2.5 rounded-xl text-xs font-black transition uppercase tracking-wider flex items-center space-x-1.5 cursor-pointer bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-300 border border-indigo-800/50"
+                        title="Study this topic with Shola AI"
+                      >
+                        <MessageCircle className="h-3 w-3" />
+                        <span>Shola</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => onStartQuest(quest)}
+                      className={`px-5 py-2.5 rounded-xl text-xs font-black transition uppercase tracking-wider flex items-center space-x-1.5 cursor-pointer ${
+                        isCompleted
+                          ? "bg-[#05060f] hover:bg-[#0f1233] text-indigo-400 border border-indigo-900/50"
+                          : "bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-950/20"
+                      }`}
+                    >
+                      <Play className="h-3 w-3 fill-current" />
+                      <span>{isCompleted ? "Redo" : "Learn Now"}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             )
@@ -109,8 +122,7 @@ export const QuestList = ({ quests, profile, completedQuests, loadingQuests, onS
                 No active quests for {profile.class_level} yet.
               </p>
               <p className="text-xs text-indigo-450 mt-2 max-w-sm mx-auto leading-relaxed">
-                Sync with di Teacher Pi or choose "🎓 Teacher Pi" tab above fɔh generate and publish fresh custom
-                quests using Gemini AI!
+                Ask your teacher to publish quests from the Quest Bank, or use Shola to study a topic while you wait!
               </p>
             </div>
           )}

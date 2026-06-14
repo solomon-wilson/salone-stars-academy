@@ -26,6 +26,7 @@ import { SyncConsole } from "./features/pupil-play/sync-console"
 import { PupilProfileCard } from "./features/pupil-play/pupil-profile-card"
 import { QuestList } from "./features/pupil-play/quest-list"
 import { QuizView } from "./features/pupil-play/quiz-view"
+import { SholaChat } from "./features/pupil-play/shola-chat"
 import { useQuizEngine } from "./features/pupil-play/hooks/use-quiz-engine"
 import { TeacherAuthForm } from "./features/teacher-pi/teacher-auth-form"
 import { PiStatusCard } from "./features/teacher-pi/pi-status-card"
@@ -70,6 +71,9 @@ export default function App() {
   // Billing state
   const [pricingOpen, setPricingOpen] = useState(false)
   const [upgradingLoading, setUpgradingLoading] = useState(false)
+
+  // Shola chat state
+  const [sholaChatQuest, setSholaChatQuest] = useState<Quest | null>(null)
 
   // Navigation state
   const [activeTab, setActiveTab] = useState<"pupil" | "teacher" | "parent">("pupil")
@@ -499,7 +503,7 @@ export default function App() {
             <div className="bg-[#0f1233] p-1 rounded-xl border border-indigo-900/50 flex">
               <button
                 id="tab-pupil"
-                onClick={() => { setActiveTab("pupil"); quiz.exitQuest() }}
+                onClick={() => { setActiveTab("pupil"); quiz.exitQuest(); setSholaChatQuest(null) }}
                 className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition text-sm font-medium cursor-pointer ${
                   activeTab === "pupil"
                     ? "bg-indigo-600 text-white shadow-[0_0_15px_rgba(99,102,241,0.4)] border border-indigo-400/30 font-bold"
@@ -511,7 +515,7 @@ export default function App() {
               </button>
               <button
                 id="tab-teacher"
-                onClick={() => { setActiveTab("teacher"); quiz.exitQuest() }}
+                onClick={() => { setActiveTab("teacher"); quiz.exitQuest(); setSholaChatQuest(null) }}
                 className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition text-sm font-medium cursor-pointer ${
                   activeTab === "teacher"
                     ? "bg-indigo-600 text-white shadow-[0_0_15px_rgba(99,102,241,0.4)] border border-indigo-400/30 font-bold"
@@ -523,7 +527,7 @@ export default function App() {
               </button>
               <button
                 id="tab-parent"
-                onClick={() => { setActiveTab("parent"); quiz.exitQuest() }}
+                onClick={() => { setActiveTab("parent"); quiz.exitQuest(); setSholaChatQuest(null) }}
                 className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition text-sm font-medium cursor-pointer ${
                   activeTab === "parent"
                     ? "bg-indigo-600 text-white shadow-[0_0_15px_rgba(99,102,241,0.4)] border border-indigo-400/30 font-bold"
@@ -613,13 +617,20 @@ export default function App() {
 
             <div className="lg:col-span-2 space-y-6">
               <AnimatePresence mode="wait">
-                {!quiz.activeQuest ? (
+                {sholaChatQuest !== null ? (
+                  <SholaChat
+                    quest={sholaChatQuest}
+                    classLevel={profile.class_level}
+                    onExit={() => setSholaChatQuest(null)}
+                  />
+                ) : !quiz.activeQuest ? (
                   <QuestList
                     quests={questsList}
                     profile={profile}
                     completedQuests={completedQuests}
                     loadingQuests={loadingQuests}
-                    onStartQuest={quiz.startQuest}
+                    onStartQuest={quest => { setSholaChatQuest(null); quiz.startQuest(quest) }}
+                    onStudyWithShola={quest => { quiz.exitQuest(); setSholaChatQuest(quest) }}
                   />
                 ) : (
                   <QuizView

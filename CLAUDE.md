@@ -13,7 +13,33 @@ npm run clean            # Remove dist/ and server.js
 npm run verify:sync      # Verify sync API + LWW merge (server must be running)
 npm run verify:publish   # Verify quest publish validation
 npm run verify:parent    # Verify parent sync + protected homework API
+npm run verify:openapi   # Smoke-test OpenAPI spec + v1 routes
+npm run mcp:dev          # Start MCP server (stdio) against SSA_API_URL
+npm run mcp:sse          # Start MCP server (HTTP/SSE) on MCP_SSE_PORT
 ```
+
+## External API & MCP
+
+Versioned REST at `/api/v1/*`. Legacy `/api/*` aliases include `Deprecation: true` headers.
+
+| Resource | Location |
+|---|---|
+| OpenAPI spec | `GET /api/openapi.json` |
+| Swagger UI | `GET /api/docs` |
+| Integrator docs | `docs/API.md`, `docs/AUTH.md`, `docs/MCP.md` |
+| MCP server | `packages/ssa-mcp-server/` |
+
+Auth: Firebase Bearer **or** `ssa_live_...` API key (`src/server/authMiddleware.ts`). RBAC in `src/server/rbac.ts`.
+
+### API/MCP pitfalls (do not repeat)
+
+- MCP tools are thin wrappers over REST — never expose Admin SDK, billing, or Firestore directly
+- Never pass `GEMINI_API_KEY`, `STRIPE_SECRET_KEY`, or Firebase Admin creds to MCP env
+- API keys stored in Firestore `api_keys/` — client SDK denied; Admin SDK only
+- Teacher routes require `role === teacher` OR `teacher:*` scope — Firebase auth alone is insufficient
+- Sync requires auth in `cloud`/`hybrid` mode; optional only in Pi LAN mode
+- MCP SSE must run as long-lived process — not inside Vercel serverless
+- OpenAPI spec generated from Zod schemas in `src/api/schemas/` — keep in sync with route handlers
 
 ## Architecture Overview
 
@@ -21,21 +47,18 @@ npm run verify:parent    # Verify parent sync + protected homework API
 
 ### Server (`server.ts`)
 
-Express API + static host. Protected routes use Firebase ID token via `requireAuth` middleware (`src/server/authMiddleware.ts`).
+Express API + static host. App factory in `src/server/app.ts`. Protected routes use multi-mode auth (`src/server/authMiddleware.ts`).
 
 | Route | Auth | Purpose |
 |---|---|---|
-| `GET /health` | None | Health check + deployment mode |
-| `GET /api/quests` | None | Quest catalog |
-| `POST /api/sync` | Optional | LWW pupil merge (supports `parentId`) |
-| `GET /api/teacher/students` | Required | Leaderboard + sync logs |
-| `POST /api/teacher/generate-quest` | Required | Gemini AI (rate-limited 10/hr) |
-| `POST /api/teacher/publish-quest` | Required | Publish quest (needs subject + class_level) |
-| `POST /api/parent/generate-homework` | Required | Gemini homework draft (5/day/parent) |
-| `POST /api/parent/publish-homework` | Required | Parent-approved homework quest |
-| `POST /api/billing/checkout` | Required | Stripe Checkout (`subscriberRole: parent\|teacher`) |
-| `GET /api/billing/success` | None | Redirect handler → updates Firestore subscription |
-| `POST /api/billing/webhook` | Stripe sig | Webhook for checkout.session.completed |
+| `GET /api/v1/health` | None | Health check + deployment mode |
+| `GET /api/v1/quests` | None | Quest catalog (ETag cached) |
+| `POST /api/v1/sync` | Optional (required cloud) | LWW pupil merge |
+| `GET /api/v1/teacher/students` | Teacher / `pupils:read` | Leaderboard + sync logs |
+| `POST /api/v1/teacher/generate-quest` | Teacher + premium | Gemini AI (10/hr) |
+| `POST /api/v1/keys` | Firebase auth | Create scoped API key |
+| `GET /api/openapi.json` | None | OpenAPI 3.1 spec |
+| `GET /api/docs` | None | Swagger UI |
 
 ### Data Layer — DataPort Adapters
 

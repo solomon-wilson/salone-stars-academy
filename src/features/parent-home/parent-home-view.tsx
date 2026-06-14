@@ -5,6 +5,7 @@ import { ChildProfileLinker } from "./child-profile-linker"
 import { ProgressDigest } from "./progress-digest"
 import { DailyPathCard } from "./daily-path-card"
 import { WeeklyTopicForm } from "./weekly-topic-form"
+import { QuestionBankBrowser } from "./question-bank-browser"
 import { ValueSummaryCard } from "./value-summary-card"
 import { WhatsappOptInForm } from "./whatsapp-opt-in-form"
 import { SchoolInviteLinker } from "./school-invite-linker"
@@ -87,8 +88,7 @@ export const ParentHomeView = ({
   const [weeklyTopics, setWeeklyTopics] = useState("")
   const [savedWeeklyTopics, setSavedWeeklyTopics] = useState("")
   const [savingTopics, setSavingTopics] = useState(false)
-  const [generating, setGenerating] = useState(false)
-  const [homeworkDraft, setHomeworkDraft] = useState<Quest | null>(null)
+  const [showBankBrowser, setShowBankBrowser] = useState(false)
   const [inviteCode, setInviteCode] = useState("")
   const [linkingInvite, setLinkingInvite] = useState(false)
   const [whatsappPhone, setWhatsappPhone] = useState(userProfile?.whatsappPhone ?? "")
@@ -186,52 +186,24 @@ export const ParentHomeView = ({
     }
   }
 
-  const handleGenerateHomework = async () => {
-    if (!selectedChild || !currentUser) return
-    setGenerating(true)
-    setHomeworkDraft(null)
-    try {
-      const resp = await apiFetch("/api/parent/generate-homework", {
-        method: "POST",
-        body: JSON.stringify({
-          pupilId: selectedChild.id,
-          class_level: selectedChild.class_level,
-          topics: weeklyTopics,
-          subject: "Mixed",
-        }),
-      })
-      if (!resp.ok) {
-        const err = await resp.json()
-        throw new Error(err.error || "Generation failed")
-      }
-      const draft = await resp.json()
-      setHomeworkDraft({
-        ...draft,
-        id: `draft-${Date.now()}`,
-        source: "generated",
-      })
-    } catch (error) {
-      console.error(error)
-      showToast(error instanceof Error ? error.message : "Could not generate homework.", "error")
-    } finally {
-      setGenerating(false)
-    }
-  }
-
-  const handleApproveHomework = async () => {
-    if (!homeworkDraft) return
+  const handlePublishQuestPack = async (questIds: string[], title: string) => {
+    if (!selectedChild) return
     try {
       const resp = await apiFetch("/api/parent/publish-homework", {
         method: "POST",
-        body: JSON.stringify(homeworkDraft),
+        body: JSON.stringify({
+          questIds,
+          title,
+          class_level: selectedChild.class_level,
+        }),
       })
       if (!resp.ok) throw new Error("Publish failed")
-      setHomeworkDraft(null)
+      setShowBankBrowser(false)
       onRefreshQuests()
-      showToast("Homework quest approved! Your child can practice it now.", "success")
+      showToast("Practice pack published! Your child can start it now.", "success")
     } catch (error) {
       console.error(error)
-      showToast("Could not publish homework quest.", "error")
+      showToast("Could not publish practice pack.", "error")
     }
   }
 
@@ -379,13 +351,18 @@ export const ParentHomeView = ({
           topics={weeklyTopics}
           isPremium={isPremium}
           saving={savingTopics}
-          generating={generating}
-          generatedTitle={homeworkDraft?.title || null}
           onTopicsChange={setWeeklyTopics}
           onSaveTopics={handleSaveTopics}
-          onGenerateHomework={handleGenerateHomework}
-          onApproveHomework={handleApproveHomework}
+          onOpenBankBrowser={() => setShowBankBrowser(v => !v)}
         />
+        {showBankBrowser && (
+          <QuestionBankBrowser
+            childClassLevel={selectedChild?.class_level || childClass}
+            isPremium={isPremium}
+            onPublishPack={handlePublishQuestPack}
+            onUpgrade={onUpgrade}
+          />
+        )}
         <WhatsappOptInForm
           phone={whatsappPhone}
           optIn={digestOptIn}
